@@ -82,12 +82,17 @@ app = FastAPI(title="LARS Backend")
 
 @app.get("/healthz")
 async def healthz():
+    # Liveness-only; do not depend on DB for platform healthcheck
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz():
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return {"status": "ok"}
     except Exception as e:
-        # Expose error details for local debugging
         return JSONResponse(status_code=500, content={"status": "error", "detail": repr(e), "hint": _ssl_hint()})
 
 
