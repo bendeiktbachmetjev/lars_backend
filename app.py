@@ -185,20 +185,61 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
                     text("""
                         INSERT INTO daily_entries (
                             patient_id, entry_date, bristol_scale,
-                            food_consumption, drink_consumption, raw_data
+                            food_consumption, drink_consumption, raw_data,
+                            stool_count, pads_used, urgency, night_stools,
+                            leakage, incomplete_evac, bloating, impact_score, activity_interfere,
+                            food_vegetables_all, food_root_vegetables, food_whole_grains, food_whole_grain_bread,
+                            food_nuts_and_seeds, food_legumes, food_fruits_with_skin, food_berries,
+                            food_soft_fruits_no_skin, food_muesli_and_bran,
+                            drink_water, drink_coffee, drink_tea, drink_alcohol,
+                            drink_carbonated, drink_juices, drink_dairy, drink_energy
                         ) VALUES (
                             :patient_id,
                             COALESCE(CAST(:entry_date AS DATE), CURRENT_DATE),
                             :bristol_scale,
                             COALESCE(CAST(:food_consumption AS JSONB), '{}'::jsonb),
                             COALESCE(CAST(:drink_consumption AS JSONB), '{}'::jsonb),
-                            COALESCE(CAST(:raw_data AS JSONB), '{}'::jsonb)
+                            COALESCE(CAST(:raw_data AS JSONB), '{}'::jsonb),
+                            :stool_count, :pads_used, :urgency, :night_stools,
+                            :leakage, :incomplete_evac, :bloating, :impact_score, :activity_interfere,
+                            :food_vegetables_all, :food_root_vegetables, :food_whole_grains, :food_whole_grain_bread,
+                            :food_nuts_and_seeds, :food_legumes, :food_fruits_with_skin, :food_berries,
+                            :food_soft_fruits_no_skin, :food_muesli_and_bran,
+                            :drink_water, :drink_coffee, :drink_tea, :drink_alcohol,
+                            :drink_carbonated, :drink_juices, :drink_dairy, :drink_energy
                         )
                         ON CONFLICT (patient_id, entry_date) DO UPDATE SET
                             bristol_scale = EXCLUDED.bristol_scale,
                             food_consumption = EXCLUDED.food_consumption,
                             drink_consumption = EXCLUDED.drink_consumption,
-                            raw_data = EXCLUDED.raw_data
+                            raw_data = EXCLUDED.raw_data,
+                            stool_count = EXCLUDED.stool_count,
+                            pads_used = EXCLUDED.pads_used,
+                            urgency = EXCLUDED.urgency,
+                            night_stools = EXCLUDED.night_stools,
+                            leakage = EXCLUDED.leakage,
+                            incomplete_evac = EXCLUDED.incomplete_evac,
+                            bloating = EXCLUDED.bloating,
+                            impact_score = EXCLUDED.impact_score,
+                            activity_interfere = EXCLUDED.activity_interfere,
+                            food_vegetables_all = EXCLUDED.food_vegetables_all,
+                            food_root_vegetables = EXCLUDED.food_root_vegetables,
+                            food_whole_grains = EXCLUDED.food_whole_grains,
+                            food_whole_grain_bread = EXCLUDED.food_whole_grain_bread,
+                            food_nuts_and_seeds = EXCLUDED.food_nuts_and_seeds,
+                            food_legumes = EXCLUDED.food_legumes,
+                            food_fruits_with_skin = EXCLUDED.food_fruits_with_skin,
+                            food_berries = EXCLUDED.food_berries,
+                            food_soft_fruits_no_skin = EXCLUDED.food_soft_fruits_no_skin,
+                            food_muesli_and_bran = EXCLUDED.food_muesli_and_bran,
+                            drink_water = EXCLUDED.drink_water,
+                            drink_coffee = EXCLUDED.drink_coffee,
+                            drink_tea = EXCLUDED.drink_tea,
+                            drink_alcohol = EXCLUDED.drink_alcohol,
+                            drink_carbonated = EXCLUDED.drink_carbonated,
+                            drink_juices = EXCLUDED.drink_juices,
+                            drink_dairy = EXCLUDED.drink_dairy,
+                            drink_energy = EXCLUDED.drink_energy
                         RETURNING id
                     """)
                     .bindparams(
@@ -208,6 +249,33 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
                         food_consumption=json.dumps(payload.food_consumption or {}),
                         drink_consumption=json.dumps(payload.drink_consumption or {}),
                         raw_data=json.dumps(payload.raw_data or {}),
+                        stool_count=(payload.raw_data or {}).get('stool_count'),
+                        pads_used=(payload.raw_data or {}).get('pads_used'),
+                        urgency=((payload.raw_data or {}).get('urgency') == 'Yes'),
+                        night_stools=((payload.raw_data or {}).get('night_stools') == 'Yes'),
+                        leakage=(payload.raw_data or {}).get('leakage'),
+                        incomplete_evac=((payload.raw_data or {}).get('incomplete_evac') == 'Yes'),
+                        bloating=int((payload.raw_data or {}).get('bloating', 0)) if (payload.raw_data or {}).get('bloating') is not None else None,
+                        impact_score=int((payload.raw_data or {}).get('impact_score', 0)) if (payload.raw_data or {}).get('impact_score') is not None else None,
+                        activity_interfere=int((payload.raw_data or {}).get('activity_interfere', 0)) if (payload.raw_data or {}).get('activity_interfere') is not None else None,
+                        food_vegetables_all=(payload.food_consumption or {}).get('Vegetables (all types)'),
+                        food_root_vegetables=(payload.food_consumption or {}).get('Root vegetables'),
+                        food_whole_grains=(payload.food_consumption or {}).get('Whole grains'),
+                        food_whole_grain_bread=(payload.food_consumption or {}).get('Whole grain bread'),
+                        food_nuts_and_seeds=(payload.food_consumption or {}).get('Nuts and seeds'),
+                        food_legumes=(payload.food_consumption or {}).get('Legumes'),
+                        food_fruits_with_skin=(payload.food_consumption or {}).get('Fruits with skin'),
+                        food_berries=(payload.food_consumption or {}).get('Berries (any)'),
+                        food_soft_fruits_no_skin=(payload.food_consumption or {}).get('Soft fruits without skin'),
+                        food_muesli_and_bran=(payload.food_consumption or {}).get('Muesli and bran cereals'),
+                        drink_water=(payload.drink_consumption or {}).get('Water'),
+                        drink_coffee=(payload.drink_consumption or {}).get('Coffee'),
+                        drink_tea=(payload.drink_consumption or {}).get('Tea'),
+                        drink_alcohol=(payload.drink_consumption or {}).get('Alcohol'),
+                        drink_carbonated=(payload.drink_consumption or {}).get('Carbonated drinks'),
+                        drink_juices=(payload.drink_consumption or {}).get('Juices'),
+                        drink_dairy=(payload.drink_consumption or {}).get('Dairy drinks'),
+                        drink_energy=(payload.drink_consumption or {}).get('Energy drinks'),
                     )
                 )
                 row2 = res2.first()
