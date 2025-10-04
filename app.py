@@ -297,16 +297,27 @@ async def send_monthly(payload: MonthlyPayload, x_patient_code: Optional[str] = 
                 res2 = await session.execute(
                     text("""
                         INSERT INTO monthly_entries (
-                            patient_id, entry_date, qol_score, raw_data
+                            patient_id, entry_date, qol_score, raw_data,
+                            avoid_travel, avoid_social, embarrassed, worry_notice,
+                            depressed, control, satisfaction
                         ) VALUES (
                             :patient_id,
                             COALESCE(CAST(:entry_date AS DATE), CURRENT_DATE),
                             :qol_score,
-                            COALESCE(CAST(:raw_data AS JSONB), '{}'::jsonb)
+                            COALESCE(CAST(:raw_data AS JSONB), '{}'::jsonb),
+                            :avoid_travel, :avoid_social, :embarrassed, :worry_notice,
+                            :depressed, :control, :satisfaction
                         )
                         ON CONFLICT (patient_id, entry_date) DO UPDATE SET
                             qol_score = EXCLUDED.qol_score,
-                            raw_data = EXCLUDED.raw_data
+                            raw_data = EXCLUDED.raw_data,
+                            avoid_travel = EXCLUDED.avoid_travel,
+                            avoid_social = EXCLUDED.avoid_social,
+                            embarrassed = EXCLUDED.embarrassed,
+                            worry_notice = EXCLUDED.worry_notice,
+                            depressed = EXCLUDED.depressed,
+                            control = EXCLUDED.control,
+                            satisfaction = EXCLUDED.satisfaction
                         RETURNING id
                     """)
                     .bindparams(
@@ -314,6 +325,13 @@ async def send_monthly(payload: MonthlyPayload, x_patient_code: Optional[str] = 
                         entry_date=payload.entry_date,
                         qol_score=payload.qol_score,
                         raw_data=json.dumps(payload.raw_data or {}),
+                        avoid_travel=int((payload.raw_data or {}).get('avoid_travel', 0)),
+                        avoid_social=int((payload.raw_data or {}).get('avoid_social', 0)),
+                        embarrassed=int((payload.raw_data or {}).get('embarrassed', 0)),
+                        worry_notice=int((payload.raw_data or {}).get('worry_notice', 0)),
+                        depressed=int((payload.raw_data or {}).get('depressed', 0)),
+                        control=int((payload.raw_data or {}).get('control', 0)),
+                        satisfaction=int((payload.raw_data or {}).get('satisfaction', 0)),
                     )
                 )
                 row2 = res2.first()
