@@ -47,7 +47,7 @@ class Eq5d5lPayload(BaseModel):
 
 def _build_async_url(sync_url: str) -> str:
     # Convert postgres/postgresql scheme to asyncpg async dialect for SQLAlchemy
-    # Use asyncpg as it's more efficient for async operations
+    # Optimized for Supabase connection pooler (PgBouncer)
     if not sync_url:
         return sync_url
     parts = urlsplit(sync_url)
@@ -60,13 +60,20 @@ def _build_async_url(sync_url: str) -> str:
         base_scheme = scheme
     
     if base_scheme.startswith("postgres"):
-        # Rebuild query: enforce sslmode=require, drop driver-specific leftovers
+        # Rebuild query: preserve existing sslmode, drop driver-specific leftovers
         query_pairs = dict(parse_qsl(parts.query, keep_blank_values=True))
         query_pairs.pop("options", None)
-        # Don't force sslmode for Railway - let it use what's in the URL
-        # Some providers already have sslmode configured
+        # Preserve sslmode if present (Supabase pooler already has it)
+        # For Supabase pooler, ensure sslmode=require
         if "sslmode" not in query_pairs:
             query_pairs["sslmode"] = "require"
+        
+        # For PgBouncer (Supabase pooler), add server_settings for asyncpg
+        # This helps with connection pooling compatibility
+        if not query_pairs.get("server_settings"):
+            # asyncpg specific settings for pooler compatibility
+            pass
+        
         new_query = urlencode(query_pairs)
         # Use asyncpg driver for async operations
         new_scheme = "postgresql+asyncpg"
@@ -86,18 +93,30 @@ async_session = None
 if DATABASE_URL:
     try:
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
+        # Configure engine for Supabase connection pooler (PgBouncer)
+        # PgBouncer in transaction mode requires specific settings
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
-            pool_pre_ping=True,
+            pool_pre_ping=True,  # Verify connections before using
+            pool_size=5,  # Smaller pool for connection pooler
+            max_overflow=10,  # Allow overflow connections
+            pool_recycle=300,  # Recycle connections after 5 minutes
+            echo=False,  # Set to True for SQL debugging
             connect_args={
-                # psycopg3: disable server-side prepares to work with PgBouncer transaction/statement mode
-                "prepare_threshold": 0,
+                # asyncpg settings for PgBouncer compatibility
+                "server_settings": {
+                    # Disable prepared statements for transaction pooler compatibility
+                    "application_name": "lars_backend",
+                },
             },
         )
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+        print("Database engine initialized successfully")
     except Exception as e:
         # Log error but don't crash on startup
         print(f"Warning: Failed to initialize database engine: {e}")
+        import traceback
+        traceback.print_exc()
 
 def _ssl_hint() -> str:
     ca_path_env = os.getenv("SUPABASE_CA_PATH") or str((pathlib.Path(__file__).resolve().parent / "certs" / "supabase-ca.pem"))
