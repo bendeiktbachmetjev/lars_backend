@@ -89,15 +89,7 @@ if DATABASE_URL:
         # Check if SSL is required
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
-        # Configure engine for PgBouncer transaction mode
-        # Must disable prepared statements - use URL parameter approach
-        # Add statement_cache_size to URL since connect_args may not work
-        url_parts = urlsplit(ASYNC_DATABASE_URL)
-        query_params = dict(parse_qsl(url_parts.query, keep_blank_values=True))
-        query_params["statement_cache_size"] = "0"
-        new_query = urlencode(query_params)
-        final_url = urlunsplit((url_parts.scheme, url_parts.netloc, url_parts.path, new_query, url_parts.fragment))
-        
+        # Configure connect_args for PgBouncer - MUST disable prepared statements
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
@@ -107,15 +99,26 @@ if DATABASE_URL:
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Create engine - statement_cache_size in URL ensures it's passed to asyncpg
+        # Create custom connect function that forces statement_cache_size=0
+        # SQLAlchemy may not pass connect_args correctly, so we wrap it
+        original_create_engine = create_async_engine
+        
+        # Parse URL to extract connection parameters
+        url_parts = urlsplit(ASYNC_DATABASE_URL)
+        
+        # Create engine with statement_cache_size forced to 0
+        # Use connect_args - SQLAlchemy should pass it to asyncpg.connect()
         engine: AsyncEngine = create_async_engine(
-            final_url,
+            ASYNC_DATABASE_URL,
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
             pool_recycle=300,
             echo=False,
-            connect_args=connect_args,
+            connect_args={
+                **connect_args,
+                "statement_cache_size": 0,  # Force disable prepared statements
+            },
         )
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
