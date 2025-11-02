@@ -307,7 +307,14 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
                 row2 = res2.first()
         return {"status": "ok", "id": str(row2[0])}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "detail": repr(e)})
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Error in sendDaily: {error_type}: {error_msg}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500, 
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
+        )
 
 
 @app.post("/sendMonthly")
