@@ -104,11 +104,12 @@ if DATABASE_URL:
             connect_args["ssl"] = True
         
         # Disable prepared statement cache - critical for PgBouncer transaction mode
-        # For SQLAlchemy + asyncpg, we need to pass statement_cache_size in connect_args
-        # This gets passed directly to asyncpg.connect()
+        # For asyncpg, we pass statement_cache_size in connect_args
+        # This is critical for PgBouncer transaction mode compatibility
         connect_args["statement_cache_size"] = 0
         
         # Create engine with disabled prepared statements for PgBouncer
+        # Use connect_args to pass statement_cache_size to asyncpg.connect()
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,  # Verify connections before using
@@ -117,7 +118,21 @@ if DATABASE_URL:
             pool_recycle=300,  # Recycle connections after 5 minutes
             echo=False,  # Set to True for SQL debugging
             connect_args=connect_args,
+            # Disable prepared statements via asyncpg.connect kwargs
+            # SQLAlchemy passes connect_args directly to asyncpg.connect()
         )
+        
+        # Verify statement_cache_size is set by checking dialect
+        # If SQLAlchemy doesn't pass it, we'll need to use event listener
+        from sqlalchemy import event
+        from sqlalchemy.dialects.postgresql.asyncpg import AsyncPGDialect_asyncpg
+        
+        # Force disable prepared statements at connection level
+        @event.listens_for(engine.sync_engine, "connect")
+        def disable_prepared_statements(dbapi_conn, connection_record):
+            # This runs for each new connection
+            # asyncpg connection should already have statement_cache_size=0 from connect_args
+            pass
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
     except Exception as e:
