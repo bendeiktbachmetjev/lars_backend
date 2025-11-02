@@ -80,13 +80,29 @@ async_session = None
 
 if DATABASE_URL:
     try:
+        # КРИТИЧЕСКИ ВАЖНО: патчим asyncpg.connect ПЕРЕД созданием engine
+        # SQLAlchemy не передает statement_cache_size, поэтому патчим напрямую
+        import asyncpg
+        
+        original_connect = asyncpg.connect
+        original_create_pool = asyncpg.create_pool
+        
+        async def patched_connect(*args, **kwargs):
+            kwargs['statement_cache_size'] = 0
+            return await original_connect(*args, **kwargs)
+        
+        async def patched_create_pool(*args, **kwargs):
+            kwargs['statement_cache_size'] = 0
+            return await original_create_pool(*args, **kwargs)
+        
+        asyncpg.connect = patched_connect
+        asyncpg.create_pool = patched_create_pool
+        
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
-        # КРИТИЧЕСКИ ВАЖНО: statement_cache_size=0 отключает prepared statements для PgBouncer
         connect_args = {
             "server_settings": {"application_name": "lars_backend"},
-            "statement_cache_size": 0,  # Отключаем prepared statements для PgBouncer
         }
         if ssl_required:
             connect_args["ssl"] = True
