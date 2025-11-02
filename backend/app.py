@@ -47,7 +47,7 @@ class Eq5d5lPayload(BaseModel):
 
 def _build_async_url(sync_url: str) -> str:
     # Convert postgres/postgresql scheme to asyncpg async dialect for SQLAlchemy
-    # Optimized for Supabase connection pooler (PgBouncer)
+    # asyncpg doesn't support sslmode in URL - we'll handle SSL via connect_args
     if not sync_url:
         return sync_url
     parts = urlsplit(sync_url)
@@ -60,21 +60,13 @@ def _build_async_url(sync_url: str) -> str:
         base_scheme = scheme
     
     if base_scheme.startswith("postgres"):
-        # Rebuild query: preserve existing sslmode, drop driver-specific leftovers
+        # Rebuild query: remove sslmode (asyncpg doesn't support it in URL)
+        # Remove driver-specific leftovers
         query_pairs = dict(parse_qsl(parts.query, keep_blank_values=True))
         query_pairs.pop("options", None)
-        # Preserve sslmode if present (Supabase pooler already has it)
-        # For Supabase pooler, ensure sslmode=require
-        if "sslmode" not in query_pairs:
-            query_pairs["sslmode"] = "require"
+        query_pairs.pop("sslmode", None)  # Remove sslmode - we'll use SSL via connect_args
         
-        # For PgBouncer (Supabase pooler), add server_settings for asyncpg
-        # This helps with connection pooling compatibility
-        if not query_pairs.get("server_settings"):
-            # asyncpg specific settings for pooler compatibility
-            pass
-        
-        new_query = urlencode(query_pairs)
+        new_query = urlencode(query_pairs) if query_pairs else ""
         # Use asyncpg driver for async operations
         new_scheme = "postgresql+asyncpg"
         new_parts = (new_scheme, parts.netloc, parts.path, new_query, parts.fragment)
@@ -93,8 +85,23 @@ async_session = None
 if DATABASE_URL:
     try:
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
+        
+        # Check if SSL is required (from original URL or environment)
+        ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
+        
         # Configure engine for Supabase connection pooler (PgBouncer)
         # PgBouncer in transaction mode requires specific settings
+        connect_args = {
+            "server_settings": {
+                "application_name": "lars_backend",
+            },
+        }
+        
+        # Set SSL mode for asyncpg (asyncpg uses 'ssl' parameter, not 'sslmode')
+        if ssl_required:
+            # For Supabase, we require SSL but don't verify certificates (Supabase handles that)
+            connect_args["ssl"] = "require"
+        
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,  # Verify connections before using
@@ -102,13 +109,7 @@ if DATABASE_URL:
             max_overflow=10,  # Allow overflow connections
             pool_recycle=300,  # Recycle connections after 5 minutes
             echo=False,  # Set to True for SQL debugging
-            connect_args={
-                # asyncpg settings for PgBouncer compatibility
-                "server_settings": {
-                    # Disable prepared statements for transaction pooler compatibility
-                    "application_name": "lars_backend",
-                },
-            },
+            connect_args=connect_args,
         )
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
