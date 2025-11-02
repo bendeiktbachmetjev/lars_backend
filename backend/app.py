@@ -537,16 +537,18 @@ async def get_next_questionnaire(
     
     try:
         async with async_session() as session:
-            # Get patient_id
+            # Get patient_id - ensure patient exists
             patient_res = await session.execute(
                 text("SELECT id FROM patients WHERE patient_code = :code").bindparams(code=patient_code)
             )
             patient_row = patient_res.first()
             if not patient_row:
                 # New patient - start with daily
+                print(f"getNextQuestionnaire: Patient with code {patient_code} not found, returning 'daily'")
                 return {"status": "ok", "type": "daily"}
             
             patient_id = patient_row[0]
+            print(f"getNextQuestionnaire: Found patient_id={patient_id} for code={patient_code}")
             
             # Check if any questionnaire for today already exists
             # (daily, weekly, or monthly - any of them means today is filled)
@@ -572,12 +574,16 @@ async def get_next_questionnaire(
                 """).bindparams(patient_id=patient_id)
             )
             
-            has_any_today = (daily_check.first() is not None or 
-                           weekly_check.first() is not None or 
-                           monthly_today_check.first() is not None)
+            has_daily = daily_check.first() is not None
+            has_weekly = weekly_check.first() is not None
+            has_monthly = monthly_today_check.first() is not None
+            has_any_today = has_daily or has_weekly or has_monthly
+            
+            print(f"getNextQuestionnaire: Today's entries - daily={has_daily}, weekly={has_weekly}, monthly={has_monthly}")
             
             if has_any_today:
                 # Today's questionnaire is already filled
+                print(f"getNextQuestionnaire: Today's questionnaire already filled, returning 'none'")
                 return {"status": "ok", "type": "none"}
             
             # Check if monthly questionnaire is needed (once per month)
@@ -610,6 +616,7 @@ async def get_next_questionnaire(
                     needs_monthly = True
             
             if needs_monthly:
+                print(f"getNextQuestionnaire: Monthly questionnaire needed, returning 'monthly'")
                 return {"status": "ok", "type": "monthly"}
             
             # Check if weekly questionnaire is needed (once per week)
@@ -642,16 +649,22 @@ async def get_next_questionnaire(
                     needs_weekly = True
             
             if needs_weekly:
+                print(f"getNextQuestionnaire: Weekly questionnaire needed, returning 'weekly'")
                 return {"status": "ok", "type": "weekly"}
             
             # Default: daily questionnaire
+            print(f"getNextQuestionnaire: Default to daily questionnaire")
             return {"status": "ok", "type": "daily"}
             
+    except HTTPException:
+        # Re-raise HTTP exceptions (400, 503, etc.)
+        raise
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
         print(f"Error in getNextQuestionnaire: {error_type}: {error_msg}")
         traceback.print_exc()
+        # Return 500 instead of raising to avoid 502 from gateway
         return JSONResponse(
             status_code=500,
             content={"status": "error", "detail": error_msg, "error_type": error_type}
@@ -682,15 +695,17 @@ async def get_lars_data(
     
     try:
         async with async_session() as session:
-            # Get patient_id
+            # Get patient_id - ensure patient exists
             patient_res = await session.execute(
                 text("SELECT id FROM patients WHERE patient_code = :code").bindparams(code=patient_code)
             )
             patient_row = patient_res.first()
             if not patient_row:
+                print(f"getLarsData: Patient with code {patient_code} not found, returning empty data")
                 return {"status": "ok", "data": []}
             
             patient_id = patient_row[0]
+            print(f"getLarsData: Found patient_id={patient_id} for code={patient_code}, period={period}")
             
             # Build SQL query based on period
             # For weekly: group by week
@@ -755,12 +770,17 @@ async def get_lars_data(
                     "score": row[1] if row[1] is not None else None  # avg_score
                 })
             
+            print(f"getLarsData: Returning {len(data)} data points")
             return {"status": "ok", "data": data}
+    except HTTPException:
+        # Re-raise HTTP exceptions (400, 503, etc.)
+        raise
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
         print(f"Error in getLarsData: {error_type}: {error_msg}")
         traceback.print_exc()
+        # Return 500 instead of raising to avoid 502 from gateway
         return JSONResponse(
             status_code=500,
             content={"status": "error", "detail": error_msg, "error_type": error_type}
