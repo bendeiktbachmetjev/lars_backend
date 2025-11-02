@@ -90,14 +90,11 @@ if DATABASE_URL:
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
         # Configure engine for Supabase connection pooler (PgBouncer)
-        # PgBouncer in transaction mode requires specific settings
+        # PgBouncer in transaction mode requires disabling prepared statements
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
             },
-            # Disable prepared statement cache for PgBouncer transaction mode
-            # PgBouncer doesn't support prepared statements properly in transaction mode
-            "statement_cache_size": 0,
         }
         
         # Set SSL mode for asyncpg (asyncpg uses 'ssl' parameter, not 'sslmode')
@@ -106,6 +103,12 @@ if DATABASE_URL:
             # asyncpg will handle SSL automatically with Supabase's certificates
             connect_args["ssl"] = True
         
+        # Disable prepared statement cache - critical for PgBouncer transaction mode
+        # For SQLAlchemy + asyncpg, we need to pass statement_cache_size in connect_args
+        # This gets passed directly to asyncpg.connect()
+        connect_args["statement_cache_size"] = 0
+        
+        # Create engine with disabled prepared statements for PgBouncer
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,  # Verify connections before using
