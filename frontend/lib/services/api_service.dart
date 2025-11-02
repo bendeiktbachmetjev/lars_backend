@@ -141,4 +141,25 @@ class ApiService {
       throw Exception('Network error: ${e.toString()}');
     }
   }
+
+  Future<Map<String, dynamic>> getNextQuestionnaire({
+    required String patientCode,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/getNextQuestionnaire');
+    try {
+      final response = await http.get(uri, headers: _headers(patientCode));
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        return decoded;
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e.toString().contains('Exception')) {
+        rethrow;
+      }
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
 }

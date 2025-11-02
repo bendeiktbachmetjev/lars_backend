@@ -512,6 +512,152 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
         )
 
 
+@app.get("/getNextQuestionnaire")
+async def get_next_questionnaire(
+    x_patient_code: Optional[str] = Header(None)
+):
+    """
+    Determine which questionnaire should be filled today for a patient.
+    Returns:
+    - "daily" if daily questionnaire should be filled
+    - "weekly" if weekly questionnaire should be filled (instead of daily, once per week)
+    - "monthly" if monthly questionnaire should be filled (instead of daily/weekly, once per month)
+    - "none" if today's questionnaire is already filled
+    
+    Priority: monthly > weekly > daily
+    """
+    if not x_patient_code:
+        raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
+    patient_code = x_patient_code.strip().upper()
+    if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
+        raise HTTPException(status_code=400, detail="Invalid patient code format")
+
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    try:
+        async with async_session() as session:
+            # Get patient_id
+            patient_res = await session.execute(
+                text("SELECT id FROM patients WHERE patient_code = :code").bindparams(code=patient_code)
+            )
+            patient_row = patient_res.first()
+            if not patient_row:
+                # New patient - start with daily
+                return {"status": "ok", "type": "daily"}
+            
+            patient_id = patient_row[0]
+            
+            # Check if any questionnaire for today already exists
+            # (daily, weekly, or monthly - any of them means today is filled)
+            daily_check = await session.execute(
+                text("""
+                    SELECT id FROM daily_entries 
+                    WHERE patient_id = :patient_id AND entry_date = CURRENT_DATE
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            weekly_check = await session.execute(
+                text("""
+                    SELECT id FROM weekly_entries 
+                    WHERE patient_id = :patient_id AND entry_date = CURRENT_DATE
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            monthly_today_check = await session.execute(
+                text("""
+                    SELECT id FROM monthly_entries 
+                    WHERE patient_id = :patient_id AND entry_date = CURRENT_DATE
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            
+            has_any_today = (daily_check.first() is not None or 
+                           weekly_check.first() is not None or 
+                           monthly_today_check.first() is not None)
+            
+            if has_any_today:
+                # Today's questionnaire is already filled
+                return {"status": "ok", "type": "none"}
+            
+            # Check if monthly questionnaire is needed (once per month)
+            # Get last monthly entry date
+            monthly_last_check = await session.execute(
+                text("""
+                    SELECT entry_date FROM monthly_entries 
+                    WHERE patient_id = :patient_id 
+                    ORDER BY entry_date DESC 
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            monthly_row = monthly_last_check.first()
+            
+            needs_monthly = False
+            if monthly_row is None:
+                # Never filled monthly - need it
+                needs_monthly = True
+            else:
+                last_monthly_date = monthly_row[0]
+                # Check if last monthly entry was more than 30 days ago
+                # Use EXTRACT to get days difference
+                days_check = await session.execute(
+                    text("""
+                        SELECT EXTRACT(DAY FROM (CURRENT_DATE - :last_date))::INTEGER as days_diff
+                    """).bindparams(last_date=last_monthly_date)
+                )
+                days_diff = days_check.first()[0]
+                if days_diff >= 30:
+                    needs_monthly = True
+            
+            if needs_monthly:
+                return {"status": "ok", "type": "monthly"}
+            
+            # Check if weekly questionnaire is needed (once per week)
+            # Get last weekly entry date
+            weekly_check = await session.execute(
+                text("""
+                    SELECT entry_date FROM weekly_entries 
+                    WHERE patient_id = :patient_id 
+                    ORDER BY entry_date DESC 
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            weekly_row = weekly_check.first()
+            
+            needs_weekly = False
+            if weekly_row is None:
+                # Never filled weekly - need it
+                needs_weekly = True
+            else:
+                last_weekly_date = weekly_row[0]
+                # Check if last weekly entry was more than 7 days ago
+                # Use EXTRACT to get days difference
+                days_check = await session.execute(
+                    text("""
+                        SELECT EXTRACT(DAY FROM (CURRENT_DATE - :last_date))::INTEGER as days_diff
+                    """).bindparams(last_date=last_weekly_date)
+                )
+                days_diff = days_check.first()[0]
+                if days_diff >= 7:
+                    needs_weekly = True
+            
+            if needs_weekly:
+                return {"status": "ok", "type": "weekly"}
+            
+            # Default: daily questionnaire
+            return {"status": "ok", "type": "daily"}
+            
+    except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Error in getNextQuestionnaire: {error_type}: {error_msg}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
+        )
+
+
 @app.get("/getLarsData")
 async def get_lars_data(
     period: str,  # "weekly", "monthly", or "yearly"
