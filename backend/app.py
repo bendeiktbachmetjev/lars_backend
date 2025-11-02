@@ -2,25 +2,24 @@ import os
 import json
 import traceback
 from typing import Optional
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
-import pathlib
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
-from sqlalchemy import text, event
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 
+# Pydantic модели - точно как отправляет frontend
 class WeeklyPayload(BaseModel):
-    # Raw indices as in the Flutter UI
     flatus_control: int
     liquid_stool_leakage: int
     bowel_frequency: int
     repeat_bowel_opening: int
     urgency_to_toilet: int
-    entry_date: Optional[str] = None  # YYYY-MM-DD, optional; defaults to today on server
+    entry_date: Optional[str] = None
     raw_data: Optional[dict] = None
 
 class DailyPayload(BaseModel):
@@ -45,63 +44,54 @@ class Eq5d5lPayload(BaseModel):
     raw_data: Optional[dict] = None
 
 
+app = FastAPI()
+
+
 def _build_async_url(sync_url: str) -> str:
-    # Convert postgres/postgresql scheme to asyncpg async dialect for SQLAlchemy
-    # asyncpg doesn't support sslmode in URL - we'll handle SSL via connect_args
+    """Конвертирует postgres:// в postgresql+asyncpg:// и убирает sslmode из URL"""
     if not sync_url:
         return sync_url
     parts = urlsplit(sync_url)
     scheme = parts.scheme
     
-    # Remove any existing driver prefix (postgresql+psycopg, postgresql+asyncpg, etc.)
     if "+" in scheme:
         base_scheme = scheme.split("+")[0]
     else:
         base_scheme = scheme
     
     if base_scheme.startswith("postgres"):
-        # Rebuild query: remove sslmode (asyncpg doesn't support it in URL)
-        # Remove driver-specific leftovers
+        # Убираем sslmode из query параметров (asyncpg не поддерживает в URL)
+        from urllib.parse import parse_qsl, urlencode
         query_pairs = dict(parse_qsl(parts.query, keep_blank_values=True))
-        query_pairs.pop("options", None)
-        query_pairs.pop("sslmode", None)  # Remove sslmode - we'll use SSL via connect_args
-        
+        query_pairs.pop("sslmode", None)
         new_query = urlencode(query_pairs) if query_pairs else ""
-        # Use asyncpg driver for async operations
+        
         new_scheme = "postgresql+asyncpg"
         new_parts = (new_scheme, parts.netloc, parts.path, new_query, parts.fragment)
+        from urllib.parse import urlunsplit
         return urlunsplit(new_parts)
     return sync_url
 
 
+# Инициализация базы данных
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-# Don't fail on startup if DATABASE_URL is missing - allow app to start
-# and report error in healthcheck instead
-
-ASYNC_DATABASE_URL = None
 engine: AsyncEngine = None
 async_session = None
 
 if DATABASE_URL:
     try:
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
-        
-        # Check if SSL is required
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
-        # Simple solution: disable prepared statements for PgBouncer
+        # КРИТИЧЕСКИ ВАЖНО: statement_cache_size=0 отключает prepared statements для PgBouncer
         connect_args = {
-            "server_settings": {
-                "application_name": "lars_backend",
-            },
-            "statement_cache_size": 0,  # Disable prepared statements for PgBouncer
+            "server_settings": {"application_name": "lars_backend"},
+            "statement_cache_size": 0,  # Отключаем prepared statements для PgBouncer
         }
-        
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Create engine
-        engine: AsyncEngine = create_async_engine(
+        engine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
             pool_size=5,
@@ -110,76 +100,24 @@ if DATABASE_URL:
             echo=False,
             connect_args=connect_args,
         )
+        
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
     except Exception as e:
-        # Log error but don't crash on startup
         print(f"Warning: Failed to initialize database engine: {e}")
-        import traceback
         traceback.print_exc()
-
-def _ssl_hint() -> str:
-    ca_path_env = os.getenv("SUPABASE_CA_PATH") or str((pathlib.Path(__file__).resolve().parent / "certs" / "supabase-ca.pem"))
-    return (
-        "If TLS fails: download Supabase CA (Database → Settings → SSL → Download certificate) "
-        f"and set sslrootcert in DATABASE_URL or SUPABASE_CA_PATH at {ca_path_env}."
-    )
-
-app = FastAPI(title="LARS Backend")
 
 
 @app.get("/healthz")
-async def healthz():
-    # Always return 200 for Railway healthcheck, but include DB status
-    db_status = "ok"
-    db_error = None
-    db_error_type = None
-    
-    try:
-        # Check if DATABASE_URL is set
-        if not DATABASE_URL:
-            db_status = "error"
-            db_error = "DATABASE_URL environment variable is not set"
-            db_error_type = "config_error"
-        elif engine is None:
-            db_status = "error"
-            db_error = "Database engine not initialized"
-            db_error_type = "initialization_error"
-        else:
-            # Try to connect and execute a simple query
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            db_status = "ok"
-    except Exception as e:
-        db_status = "error"
-        db_error = str(e)
-        db_error_type = type(e).__name__
-        # Full error trace available for logging (not exposed in response for security)
-    
-    # Return 200 so Railway doesn't fail deployment, but indicate DB status
-    response = {
-        "status": "ok",
-        "app": "running",
-        "database": db_status,
-    }
-    
-    if db_error:
-        response["error"] = db_error
-        response["error_type"] = db_error_type
-    
-    return response
+async def healthcheck():
+    db_status = "ok" if engine else "not_configured"
+    return {"status": "ok", "database": db_status}
 
-
-@app.get("/")
-async def root():
-    # Simple root endpoint to verify app is running
-    return {"status": "ok", "message": "LARS Backend API"}
 
 @app.post("/sendWeekly")
 async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = Header(None)):
     if not x_patient_code:
         raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
-
     patient_code = x_patient_code.strip().upper()
     if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
         raise HTTPException(status_code=400, detail="Invalid patient code format")
@@ -190,7 +128,7 @@ async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = He
     try:
         async with async_session() as session:
             async with session.begin():
-                # Upsert patient by code
+                # Создать или получить patient_id
                 res = await session.execute(
                     text("""
                         INSERT INTO patients (patient_code)
@@ -199,10 +137,9 @@ async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = He
                         RETURNING id
                     """).bindparams(code=patient_code)
                 )
-                row = res.first()
-                patient_id = row[0]
+                patient_id = res.first()[0]
 
-                # Insert weekly entry
+                # Сохранить weekly entry
                 res2 = await session.execute(
                     text("""
                         INSERT INTO weekly_entries (
@@ -236,8 +173,8 @@ async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = He
                         raw_data=json.dumps(payload.raw_data or {}),
                     )
                 )
-                inserted = res2.first()
-        return {"status": "ok", "id": str(inserted[0])}
+                row2 = res2.first()
+        return {"status": "ok", "id": str(row2[0])}
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
@@ -307,21 +244,11 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        
-        # Helpful error message for missing columns
-        if "does not exist" in error_msg.lower() or "column" in error_msg.lower():
-            error_msg = f"Database schema is outdated. Column missing: {error_msg}. Please run schema.sql migration in Supabase."
-        
         print(f"Error in sendDaily: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
-            content={
-                "status": "error", 
-                "detail": error_msg, 
-                "error_type": error_type,
-                "hint": "Make sure schema.sql has been applied to your database"
-            }
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
         )
 
 
@@ -444,25 +371,11 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
                 row2 = res2.first()
         return {"status": "ok", "id": str(row2[0])}
     except Exception as e:
-        # Log full error for debugging
         error_msg = str(e)
         error_type = type(e).__name__
-        
-        # Check if it's a table doesn't exist error
-        if "does not exist" in error_msg.lower() or "relation" in error_msg.lower() or "table" in error_msg.lower():
-            error_msg = f"Table 'eq5d5l_entries' does not exist. Please run the schema migration in Supabase SQL Editor."
-        
         print(f"Error in sendEq5d5l: {error_type}: {error_msg}")
         traceback.print_exc()
-        
         return JSONResponse(
             status_code=500, 
-            content={
-                "status": "error", 
-                "detail": error_msg,
-                "error_type": error_type,
-                "hint": "Check if eq5d5l_entries table exists in database"
-            }
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
         )
-
-
