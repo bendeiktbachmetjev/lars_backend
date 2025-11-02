@@ -99,14 +99,9 @@ if DATABASE_URL:
         
         # Set SSL mode for asyncpg (asyncpg uses 'ssl' parameter, not 'sslmode')
         if ssl_required:
-            # For Supabase, we require SSL
-            # asyncpg accepts True or an SSLContext, but for Supabase pooler we just need SSL enabled
-            import ssl as ssl_lib
-            # Create SSL context that requires SSL but doesn't verify (Supabase handles certificates)
-            ssl_context = ssl_lib.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl_lib.CERT_NONE
-            connect_args["ssl"] = ssl_context
+            # For Supabase connection pooler, use True to enable SSL
+            # asyncpg will handle SSL automatically with Supabase's certificates
+            connect_args["ssl"] = True
         
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
@@ -246,7 +241,14 @@ async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = He
                 inserted = res2.first()
         return {"status": "ok", "id": str(inserted[0])}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "detail": repr(e)})
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Error in sendWeekly: {error_type}: {error_msg}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500, 
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
+        )
 
 
 @app.post("/sendDaily")
@@ -357,7 +359,14 @@ async def send_monthly(payload: MonthlyPayload, x_patient_code: Optional[str] = 
                 row2 = res2.first()
         return {"status": "ok", "id": str(row2[0])}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "detail": repr(e)})
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Error in sendMonthly: {error_type}: {error_msg}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500, 
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
+        )
 
 
 @app.post("/sendEq5d5l")
