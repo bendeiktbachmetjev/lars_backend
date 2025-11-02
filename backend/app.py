@@ -9,7 +9,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
-from sqlalchemy import text
+from sqlalchemy import text, event
 from sqlalchemy.orm import sessionmaker
 
 
@@ -84,30 +84,37 @@ async_session = None
 
 if DATABASE_URL:
     try:
+        # CRITICAL: Patch asyncpg dialect BEFORE creating engine
+        # This ensures statement_cache_size=0 is always used
+        import sqlalchemy.dialects.postgresql.asyncpg as asyncpg_dialect
+        
+        # Patch the connect method to always pass statement_cache_size=0
+        original_connect = asyncpg_dialect.AsyncPGDialect_asyncpg.connect
+        
+        async def connect_with_no_prepared(self, *cargs, **cparams):
+            # Force statement_cache_size=0 for all connections
+            cparams['statement_cache_size'] = 0
+            return await original_connect(self, *cargs, **cparams)
+        
+        asyncpg_dialect.AsyncPGDialect_asyncpg.connect = connect_with_no_prepared
+        
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         
         # Check if SSL is required
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
-        # Configure connect_args for PgBouncer - MUST disable prepared statements
+        # Configure connect_args
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
             },
+            "statement_cache_size": 0,  # Also in connect_args as backup
         }
         
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Create custom connect function that forces statement_cache_size=0
-        # SQLAlchemy may not pass connect_args correctly, so we wrap it
-        original_create_engine = create_async_engine
-        
-        # Parse URL to extract connection parameters
-        url_parts = urlsplit(ASYNC_DATABASE_URL)
-        
-        # Create engine with statement_cache_size forced to 0
-        # Use connect_args - SQLAlchemy should pass it to asyncpg.connect()
+        # Create engine - dialect is already patched to disable prepared statements
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
@@ -115,10 +122,7 @@ if DATABASE_URL:
             max_overflow=10,
             pool_recycle=300,
             echo=False,
-            connect_args={
-                **connect_args,
-                "statement_cache_size": 0,  # Force disable prepared statements
-            },
+            connect_args=connect_args,
         )
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
