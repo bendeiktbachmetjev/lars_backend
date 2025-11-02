@@ -122,17 +122,22 @@ if DATABASE_URL:
             # SQLAlchemy passes connect_args directly to asyncpg.connect()
         )
         
-        # Verify statement_cache_size is set by checking dialect
-        # If SQLAlchemy doesn't pass it, we'll need to use event listener
-        from sqlalchemy import event
+        # Use custom connect function to force statement_cache_size=0
+        # This ensures asyncpg always gets statement_cache_size=0 for PgBouncer
         from sqlalchemy.dialects.postgresql.asyncpg import AsyncPGDialect_asyncpg
         
-        # Force disable prepared statements at connection level
-        @event.listens_for(engine.sync_engine, "connect")
-        def disable_prepared_statements(dbapi_conn, connection_record):
-            # This runs for each new connection
-            # asyncpg connection should already have statement_cache_size=0 from connect_args
-            pass
+        # Override the get_driver_connection method to inject statement_cache_size
+        original_get_driver_connection = AsyncPGDialect_asyncpg.get_driver_connection
+        
+        async def get_driver_connection_with_no_prepared(*args, **kwargs):
+            # Ensure statement_cache_size is always 0
+            if "statement_cache_size" not in kwargs:
+                kwargs["statement_cache_size"] = 0
+            elif kwargs.get("statement_cache_size") != 0:
+                kwargs["statement_cache_size"] = 0
+            return await original_get_driver_connection(*args, **kwargs)
+        
+        AsyncPGDialect_asyncpg.get_driver_connection = get_driver_connection_with_no_prepared
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
     except Exception as e:
