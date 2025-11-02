@@ -664,10 +664,11 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                 }
             
             patient_id = patient_row[0]
-            patient_created_date = patient_row[1]
+            patient_created_date = patient_row[1] if patient_row[1] is not None else None
             today = date.today()
             
             # Get last completion dates for each questionnaire type
+            # Handle NULL values properly - MAX returns NULL if no rows exist
             last_weekly = await session.execute(
                 text("""
                     SELECT MAX(entry_date) as last_date
@@ -675,7 +676,8 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                     WHERE patient_id = :patient_id
                 """).bindparams(patient_id=patient_id)
             )
-            last_weekly_date = last_weekly.first()[0]
+            last_weekly_row = last_weekly.first()
+            last_weekly_date = last_weekly_row[0] if last_weekly_row and last_weekly_row[0] is not None else None
             
             last_monthly = await session.execute(
                 text("""
@@ -684,7 +686,8 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                     WHERE patient_id = :patient_id
                 """).bindparams(patient_id=patient_id)
             )
-            last_monthly_date = last_monthly.first()[0]
+            last_monthly_row = last_monthly.first()
+            last_monthly_date = last_monthly_row[0] if last_monthly_row and last_monthly_row[0] is not None else None
             
             last_eq5d5l = await session.execute(
                 text("""
@@ -693,7 +696,8 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                     WHERE patient_id = :patient_id
                 """).bindparams(patient_id=patient_id)
             )
-            last_eq5d5l_date = last_eq5d5l.first()[0]
+            last_eq5d5l_row = last_eq5d5l.first()
+            last_eq5d5l_date = last_eq5d5l_row[0] if last_eq5d5l_row and last_eq5d5l_row[0] is not None else None
             
             last_daily = await session.execute(
                 text("""
@@ -702,7 +706,8 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                     WHERE patient_id = :patient_id
                 """).bindparams(patient_id=patient_id)
             )
-            last_daily_date = last_daily.first()[0]
+            last_daily_row = last_daily.first()
+            last_daily_date = last_daily_row[0] if last_daily_row and last_daily_row[0] is not None else None
             
             # Determine next questionnaire using priority logic
             questionnaire_type = None
@@ -740,7 +745,8 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                                 window_end=window_end
                             )
                         )
-                        if check_res.first()[0] > 0:
+                        check_row = check_res.first()
+                        if check_row and check_row[0] > 0:
                             milestone_filled = True
                         
                         if not milestone_filled:
@@ -804,30 +810,39 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
             # Check if today's questionnaire is already filled
             is_today_filled = False
             if questionnaire_type:
-                if questionnaire_type == "weekly":
-                    check = await session.execute(
-                        text("SELECT COUNT(*) FROM weekly_entries WHERE patient_id = :pid AND entry_date = :today")
-                        .bindparams(pid=patient_id, today=today)
-                    )
-                    is_today_filled = check.first()[0] > 0
-                elif questionnaire_type == "monthly":
-                    check = await session.execute(
-                        text("SELECT COUNT(*) FROM monthly_entries WHERE patient_id = :pid AND entry_date = :today")
-                        .bindparams(pid=patient_id, today=today)
-                    )
-                    is_today_filled = check.first()[0] > 0
-                elif questionnaire_type == "eq5d5l":
-                    check = await session.execute(
-                        text("SELECT COUNT(*) FROM eq5d5l_entries WHERE patient_id = :pid AND entry_date = :today")
-                        .bindparams(pid=patient_id, today=today)
-                    )
-                    is_today_filled = check.first()[0] > 0
-                elif questionnaire_type == "daily":
-                    check = await session.execute(
-                        text("SELECT COUNT(*) FROM daily_entries WHERE patient_id = :pid AND entry_date = :today")
-                        .bindparams(pid=patient_id, today=today)
-                    )
-                    is_today_filled = check.first()[0] > 0
+                try:
+                    if questionnaire_type == "weekly":
+                        check = await session.execute(
+                            text("SELECT COUNT(*) FROM weekly_entries WHERE patient_id = :pid AND entry_date = :today")
+                            .bindparams(pid=patient_id, today=today)
+                        )
+                        check_row = check.first()
+                        is_today_filled = check_row[0] > 0 if check_row else False
+                    elif questionnaire_type == "monthly":
+                        check = await session.execute(
+                            text("SELECT COUNT(*) FROM monthly_entries WHERE patient_id = :pid AND entry_date = :today")
+                            .bindparams(pid=patient_id, today=today)
+                        )
+                        check_row = check.first()
+                        is_today_filled = check_row[0] > 0 if check_row else False
+                    elif questionnaire_type == "eq5d5l":
+                        check = await session.execute(
+                            text("SELECT COUNT(*) FROM eq5d5l_entries WHERE patient_id = :pid AND entry_date = :today")
+                            .bindparams(pid=patient_id, today=today)
+                        )
+                        check_row = check.first()
+                        is_today_filled = check_row[0] > 0 if check_row else False
+                    elif questionnaire_type == "daily":
+                        check = await session.execute(
+                            text("SELECT COUNT(*) FROM daily_entries WHERE patient_id = :pid AND entry_date = :today")
+                            .bindparams(pid=patient_id, today=today)
+                        )
+                        check_row = check.first()
+                        is_today_filled = check_row[0] > 0 if check_row else False
+                except Exception as check_error:
+                    # If check fails, assume not filled
+                    print(f"Warning: Failed to check if today's questionnaire is filled: {check_error}")
+                    is_today_filled = False
             
             return {
                 "status": "ok",
