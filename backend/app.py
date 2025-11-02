@@ -84,60 +84,47 @@ async_session = None
 
 if DATABASE_URL:
     try:
+        # CRITICAL: Override asyncpg dialect BEFORE creating engine
+        # This ensures statement_cache_size=0 is used for PgBouncer compatibility
+        from sqlalchemy.dialects.postgresql.asyncpg import AsyncPGDialect_asyncpg
+        
+        # Store original method
+        original_get_driver_connection = AsyncPGDialect_asyncpg.get_driver_connection
+        
+        # Override to force statement_cache_size=0
+        async def get_driver_connection_no_prepared(connection, **kwargs):
+            kwargs["statement_cache_size"] = 0  # Force disable for PgBouncer
+            return await original_get_driver_connection(connection, **kwargs)
+        
+        AsyncPGDialect_asyncpg.get_driver_connection = get_driver_connection_no_prepared
+        
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         
         # Check if SSL is required (from original URL or environment)
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
         # Configure engine for Supabase connection pooler (PgBouncer)
-        # PgBouncer in transaction mode requires disabling prepared statements
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
             },
+            "statement_cache_size": 0,  # Disable prepared statements for PgBouncer
         }
         
-        # Set SSL mode for asyncpg (asyncpg uses 'ssl' parameter, not 'sslmode')
+        # Set SSL mode for asyncpg
         if ssl_required:
-            # For Supabase connection pooler, use True to enable SSL
-            # asyncpg will handle SSL automatically with Supabase's certificates
             connect_args["ssl"] = True
         
-        # Disable prepared statement cache - critical for PgBouncer transaction mode
-        # For asyncpg, we pass statement_cache_size in connect_args
-        # This is critical for PgBouncer transaction mode compatibility
-        connect_args["statement_cache_size"] = 0
-        
-        # Create engine with disabled prepared statements for PgBouncer
-        # Use connect_args to pass statement_cache_size to asyncpg.connect()
+        # Create engine - dialect override ensures statement_cache_size=0
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
-            pool_pre_ping=True,  # Verify connections before using
-            pool_size=5,  # Smaller pool for connection pooler
-            max_overflow=10,  # Allow overflow connections
-            pool_recycle=300,  # Recycle connections after 5 minutes
-            echo=False,  # Set to True for SQL debugging
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            pool_recycle=300,
+            echo=False,
             connect_args=connect_args,
-            # Disable prepared statements via asyncpg.connect kwargs
-            # SQLAlchemy passes connect_args directly to asyncpg.connect()
         )
-        
-        # Use custom connect function to force statement_cache_size=0
-        # This ensures asyncpg always gets statement_cache_size=0 for PgBouncer
-        from sqlalchemy.dialects.postgresql.asyncpg import AsyncPGDialect_asyncpg
-        
-        # Override the get_driver_connection method to inject statement_cache_size
-        original_get_driver_connection = AsyncPGDialect_asyncpg.get_driver_connection
-        
-        async def get_driver_connection_with_no_prepared(*args, **kwargs):
-            # Ensure statement_cache_size is always 0
-            if "statement_cache_size" not in kwargs:
-                kwargs["statement_cache_size"] = 0
-            elif kwargs.get("statement_cache_size") != 0:
-                kwargs["statement_cache_size"] = 0
-            return await original_get_driver_connection(*args, **kwargs)
-        
-        AsyncPGDialect_asyncpg.get_driver_connection = get_driver_connection_with_no_prepared
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
     except Exception as e:
