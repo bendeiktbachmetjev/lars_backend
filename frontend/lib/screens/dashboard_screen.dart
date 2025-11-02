@@ -17,9 +17,11 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  String? nextQuestionnaireType; // "daily", "weekly", "monthly", or "none"
-  bool isLoadingQuestionnaire = true;
-  String? questionnaireTypeName; // Display name for the questionnaire
+  String? _nextQuestionnaireType; // "daily", "weekly", "monthly", "eq5d5l", or null
+  bool _isTodayFilled = false;
+  bool _isLoadingQuestionnaire = true;
+  String? _questionnaireReason;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -29,7 +31,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadNextQuestionnaire() async {
     setState(() {
-      isLoadingQuestionnaire = true;
+      _isLoadingQuestionnaire = true;
+      _errorMessage = null;
     });
 
     try {
@@ -38,75 +41,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
       
       if (patientCode == null || patientCode.isEmpty) {
         setState(() {
-          nextQuestionnaireType = null;
-          isLoadingQuestionnaire = false;
+          _nextQuestionnaireType = null;
+          _isTodayFilled = false;
+          _isLoadingQuestionnaire = false;
+          _errorMessage = 'Please set your patient code in Profile';
         });
         return;
       }
 
       final response = await api.getNextQuestionnaire(patientCode: patientCode);
-      
-      if (response['status'] == 'ok' && response['type'] != null) {
-        final type = response['type'] as String;
+
+      if (response['status'] == 'ok') {
         setState(() {
-          nextQuestionnaireType = type;
-          isLoadingQuestionnaire = false;
-          
-          // Set display name
-          switch (type) {
-            case 'daily':
-              questionnaireTypeName = 'Daily Diary';
-              break;
-            case 'weekly':
-              questionnaireTypeName = 'Weekly LARS';
-              break;
-            case 'monthly':
-              questionnaireTypeName = 'Monthly QoL';
-              break;
-            case 'none':
-              questionnaireTypeName = null;
-              break;
-            default:
-              questionnaireTypeName = null;
-          }
+          _nextQuestionnaireType = response['questionnaire_type'];
+          _isTodayFilled = response['is_today_filled'] ?? false;
+          _questionnaireReason = response['reason'];
+          _isLoadingQuestionnaire = false;
         });
       } else {
         setState(() {
-          nextQuestionnaireType = null;
-          isLoadingQuestionnaire = false;
+          _nextQuestionnaireType = null;
+          _isTodayFilled = false;
+          _isLoadingQuestionnaire = false;
+          _errorMessage = 'Failed to load questionnaire info';
         });
       }
     } catch (e) {
       setState(() {
-        nextQuestionnaireType = null;
-        isLoadingQuestionnaire = false;
+        _nextQuestionnaireType = null;
+        _isTodayFilled = false;
+        _isLoadingQuestionnaire = false;
+        _errorMessage = 'Error: ${e.toString()}';
       });
     }
   }
 
   void _openNextQuestionnaire(BuildContext context) async {
-    if (nextQuestionnaireType == null || nextQuestionnaireType == 'none') {
+    if (_nextQuestionnaireType == null) {
       return;
     }
 
     Widget screen;
-    if (nextQuestionnaireType == 'daily') {
-      screen = const DailyQuestionnaireScreen();
-    } else if (nextQuestionnaireType == 'weekly') {
-      screen = const WeeklyQuestionnaireScreen();
-    } else if (nextQuestionnaireType == 'monthly') {
-      screen = const MonthlyQuestionnaireScreen();
-    } else {
-      return;
+    switch (_nextQuestionnaireType) {
+      case 'daily':
+        screen = const DailyQuestionnaireScreen();
+        break;
+      case 'weekly':
+        screen = const WeeklyQuestionnaireScreen();
+        break;
+      case 'monthly':
+        screen = const MonthlyQuestionnaireScreen();
+        break;
+      case 'eq5d5l':
+        screen = const Eq5d5lQuestionnaireScreen();
+        break;
+      default:
+        return;
     }
 
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => screen),
     );
-    
-    // Reload questionnaire status after returning
-    _loadNextQuestionnaire();
+
+    // Reload questionnaire info after returning from questionnaire
+    await _loadNextQuestionnaire();
+  }
+
+  String _getQuestionnaireName() {
+    switch (_nextQuestionnaireType) {
+      case 'daily':
+        return 'Daily Questionnaire';
+      case 'weekly':
+        return 'Weekly Questionnaire (LARS)';
+      case 'monthly':
+        return 'Monthly Questionnaire';
+      case 'eq5d5l':
+        return 'Quality of Life Questionnaire (EQ-5D-5L)';
+      default:
+        return 'No questionnaire needed';
+    }
   }
 
   @override
@@ -128,20 +142,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
               textAlign: TextAlign.left,
             ),
             const SizedBox(height: 16),
-            if (isLoadingQuestionnaire) ...[
+            if (_isLoadingQuestionnaire) ...[
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(16.0),
                   child: CircularProgressIndicator(),
                 ),
               ),
-            ] else if (nextQuestionnaireType == 'none') ...[
+            ] else if (_errorMessage != null) ...[
+              Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red[700], size: 28),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => _loadNextQuestionnaire(),
+                child: const Text('Retry'),
+              ),
+            ] else if (_nextQuestionnaireType == null) ...[
               Row(
                 children: [
                   Icon(Icons.check_circle, color: Colors.green[600], size: 28),
                   const SizedBox(width: 8),
                   const Text(
-                    'Filled',
+                    'All questionnaires are up to date',
                     style: TextStyle(
                       color: Colors.green,
                       fontWeight: FontWeight.w600,
@@ -150,7 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
-            ] else if (nextQuestionnaireType != null) ...[
+            ] else if (!_isTodayFilled) ...[
               Row(
                 children: [
                   Icon(Icons.info_outline, color: Colors.amber[700], size: 28),
@@ -159,21 +195,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Not filled yet',
-                          style: TextStyle(
+                        Text(
+                          _getQuestionnaireName(),
+                          style: const TextStyle(
                             color: Colors.amber,
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                           ),
                         ),
-                        if (questionnaireTypeName != null) ...[
+                        if (_questionnaireReason != null) ...[
                           const SizedBox(height: 4),
                           Text(
-                            questionnaireTypeName!,
+                            _questionnaireReason!,
                             style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 14,
+                              color: Colors.amber[700],
+                              fontSize: 12,
                             ),
                           ),
                         ],
@@ -205,37 +241,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ] else ...[
               Row(
                 children: [
-                  Icon(Icons.error_outline, color: Colors.red[700], size: 28),
+                  Icon(Icons.check_circle, color: Colors.green[600], size: 28),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Unable to load questionnaire status',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+                  Expanded(
+                    child: Text(
+                      '${_getQuestionnaireName()} - Completed',
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[400],
-                    foregroundColor: Colors.white,
-                    textStyle: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: _loadNextQuestionnaire,
-                  child: const Text('Retry'),
-                ),
               ),
             ],
             const SizedBox(height: 32),

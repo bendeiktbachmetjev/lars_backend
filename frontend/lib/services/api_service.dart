@@ -142,8 +142,6 @@ class ApiService {
     }
   }
 
-  /// Get the next questionnaire that should be shown to the patient
-  /// Returns: {questionnaire_type: "daily"|"weekly"|"monthly"|"eq5d5l"|null, is_due: bool, reason: string, priority: int}
   Future<Map<String, dynamic>> getNextQuestionnaire({
     required String patientCode,
   }) async {
@@ -152,35 +150,7 @@ class ApiService {
       final response = await http.get(uri, headers: _headers(patientCode));
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        return decoded;
-      } else {
-        throw Exception('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      if (e.toString().contains('Exception')) {
-        rethrow;
-      }
-      throw Exception('Network error: ${e.toString()}');
-    }
-  }
-
-  /// Set or update the surgery date for a patient
-  /// surgeryDate should be in ISO format: YYYY-MM-DD
-  Future<Map<String, dynamic>> setSurgeryDate({
-    required String patientCode,
-    required String surgeryDate, // ISO format: YYYY-MM-DD
-  }) async {
-    final uri = Uri.parse('$_baseUrl/setSurgeryDate');
-    final body = jsonEncode({
-      'surgery_date': surgeryDate,
-    });
-    try {
-      final response = await http.post(uri, headers: _headers(patientCode), body: body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        return decoded;
+        return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
         throw Exception('Server error: ${response.statusCode}');
       }
