@@ -99,8 +99,14 @@ if DATABASE_URL:
         
         # Set SSL mode for asyncpg (asyncpg uses 'ssl' parameter, not 'sslmode')
         if ssl_required:
-            # For Supabase, we require SSL but don't verify certificates (Supabase handles that)
-            connect_args["ssl"] = "require"
+            # For Supabase, we require SSL
+            # asyncpg accepts True or an SSLContext, but for Supabase pooler we just need SSL enabled
+            import ssl as ssl_lib
+            # Create SSL context that requires SSL but doesn't verify (Supabase handles certificates)
+            ssl_context = ssl_lib.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl_lib.CERT_NONE
+            connect_args["ssl"] = ssl_context
         
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
