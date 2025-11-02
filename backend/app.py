@@ -80,6 +80,17 @@ async_session = None
 
 if DATABASE_URL:
     try:
+        # ПРОСТОЕ РЕШЕНИЕ: автоматически переключаемся на Session Pooler (порт 5432)
+        # Transaction Pooler (порт 6543) не поддерживает prepared statements
+        # Заменяем :6543 на :5432 если используется pooler
+        if ":6543" in DATABASE_URL:
+            DATABASE_URL = DATABASE_URL.replace(":6543", ":5432")
+            print("Switched from Transaction Pooler (6543) to Session Pooler (5432) for prepared statements support")
+        elif ".pooler.supabase.com" in DATABASE_URL and ":5432" not in DATABASE_URL:
+            # Если pooler, но порт не указан явно - добавляем 5432
+            DATABASE_URL = DATABASE_URL.replace(".pooler.supabase.com", ".pooler.supabase.com:5432")
+            print("Added Session Pooler port (5432) for prepared statements support")
+        
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
@@ -98,21 +109,6 @@ if DATABASE_URL:
             echo=False,
             connect_args=connect_args,
         )
-        
-        # КРИТИЧЕСКИ ВАЖНО: переопределяем генерацию имен prepared statements
-        # Используем UUID для уникальности - это решает проблему с PgBouncer
-        from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_dbapi
-        import uuid
-        
-        # Сохраняем оригинальный __init__
-        original_init = AsyncAdapt_asyncpg_dbapi.__init__
-        
-        def patched_init(self, asyncpg_connection, prepared_statement_cache=None):
-            original_init(self, asyncpg_connection, prepared_statement_cache)
-            # Переопределяем функцию генерации имен - всегда уникальные UUID
-            self._prepared_statement_name_func = lambda: f"__asyncpg_stmt_{uuid.uuid4().hex}__"
-        
-        AsyncAdapt_asyncpg_dbapi.__init__ = patched_init
         
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
