@@ -76,16 +76,37 @@ CREATE TABLE IF NOT EXISTS monthly_entries (
   UNIQUE (patient_id, entry_date)
 );
 
+-- EQ-5D-5L entries
+CREATE TABLE IF NOT EXISTS eq5d5l_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+
+  -- EQ-5D-5L dimensions (0-4 scale: 0=no problems, 4=extreme problems/unable)
+  mobility SMALLINT NOT NULL CHECK (mobility BETWEEN 0 AND 4),
+  self_care SMALLINT NOT NULL CHECK (self_care BETWEEN 0 AND 4),
+  usual_activities SMALLINT NOT NULL CHECK (usual_activities BETWEEN 0 AND 4),
+  pain_discomfort SMALLINT NOT NULL CHECK (pain_discomfort BETWEEN 0 AND 4),
+  anxiety_depression SMALLINT NOT NULL CHECK (anxiety_depression BETWEEN 0 AND 4),
+
+  raw_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (patient_id, entry_date)
+);
+
 -- Indexes for analytics and fast lookups
 CREATE INDEX IF NOT EXISTS idx_patients_code ON patients (patient_code);
 
 CREATE INDEX IF NOT EXISTS idx_weekly_patient_date ON weekly_entries (patient_id, entry_date DESC);
 CREATE INDEX IF NOT EXISTS idx_daily_patient_date ON daily_entries (patient_id, entry_date DESC);
 CREATE INDEX IF NOT EXISTS idx_monthly_patient_date ON monthly_entries (patient_id, entry_date DESC);
+CREATE INDEX IF NOT EXISTS idx_eq5d5l_patient_date ON eq5d5l_entries (patient_id, entry_date DESC);
 
 -- JSONB indexes for exploratory analytics
 CREATE INDEX IF NOT EXISTS idx_daily_raw_data ON daily_entries USING GIN (raw_data jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS idx_monthly_raw_data ON monthly_entries USING GIN (raw_data jsonb_path_ops);
+CREATE INDEX IF NOT EXISTS idx_eq5d5l_raw_data ON eq5d5l_entries USING GIN (raw_data jsonb_path_ops);
 
 -- Basic sanity: prevent future dates if desired (optional, commented)
 -- ALTER TABLE weekly_entries ADD CONSTRAINT weekly_no_future CHECK (entry_date <= CURRENT_DATE);

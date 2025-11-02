@@ -34,6 +34,15 @@ class MonthlyPayload(BaseModel):
     qol_score: Optional[int] = None
     raw_data: Optional[dict] = None
 
+class Eq5d5lPayload(BaseModel):
+    mobility: int
+    self_care: int
+    usual_activities: int
+    pain_discomfort: int
+    anxiety_depression: int
+    entry_date: Optional[str] = None
+    raw_data: Optional[dict] = None
+
 
 def _build_async_url(sync_url: str) -> str:
     # Convert postgres/postgresql scheme to psycopg3 async dialect and ensure sslmode=require
@@ -251,6 +260,66 @@ async def send_monthly(payload: MonthlyPayload, x_patient_code: Optional[str] = 
                         patient_id=patient_id,
                         entry_date=payload.entry_date,
                         qol_score=payload.qol_score,
+                        raw_data=json.dumps(payload.raw_data or {}),
+                    )
+                )
+                row2 = res2.first()
+        return {"status": "ok", "id": str(row2[0])}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "detail": repr(e)})
+
+
+@app.post("/sendEq5d5l")
+async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = Header(None)):
+    if not x_patient_code:
+        raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
+    patient_code = x_patient_code.strip().upper()
+    if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
+        raise HTTPException(status_code=400, detail="Invalid patient code format")
+
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                res = await session.execute(
+                    text("""
+                        INSERT INTO patients (patient_code)
+                        VALUES (:code)
+                        ON CONFLICT (patient_code) DO UPDATE SET patient_code = EXCLUDED.patient_code
+                        RETURNING id
+                    """).bindparams(code=patient_code)
+                )
+                patient_id = res.first()[0]
+
+                res2 = await session.execute(
+                    text("""
+                        INSERT INTO eq5d5l_entries (
+                            patient_id, entry_date,
+                            mobility, self_care, usual_activities,
+                            pain_discomfort, anxiety_depression, raw_data
+                        ) VALUES (
+                            :patient_id,
+                            COALESCE(CAST(:entry_date AS DATE), CURRENT_DATE),
+                            :mobility, :self_care, :usual_activities,
+                            :pain_discomfort, :anxiety_depression,
+                            COALESCE(CAST(:raw_data AS JSONB), '{}'::jsonb)
+                        )
+                        ON CONFLICT (patient_id, entry_date) DO UPDATE SET
+                            mobility = EXCLUDED.mobility,
+                            self_care = EXCLUDED.self_care,
+                            usual_activities = EXCLUDED.usual_activities,
+                            pain_discomfort = EXCLUDED.pain_discomfort,
+                            anxiety_depression = EXCLUDED.anxiety_depression,
+                            raw_data = EXCLUDED.raw_data
+                        RETURNING id
+                    """)
+                    .bindparams(
+                        patient_id=patient_id,
+                        entry_date=payload.entry_date,
+                        mobility=payload.mobility,
+                        self_care=payload.self_care,
+                        usual_activities=payload.usual_activities,
+                        pain_discomfort=payload.pain_discomfort,
+                        anxiety_depression=payload.anxiety_depression,
                         raw_data=json.dumps(payload.raw_data or {}),
                     )
                 )
