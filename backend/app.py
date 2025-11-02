@@ -1,4 +1,6 @@
 import os
+import json
+import traceback
 from typing import Optional
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 import pathlib
@@ -9,7 +11,6 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
-import json
 
 
 class WeeklyPayload(BaseModel):
@@ -45,19 +46,30 @@ class Eq5d5lPayload(BaseModel):
 
 
 def _build_async_url(sync_url: str) -> str:
-    # Convert postgres/postgresql scheme to psycopg3 async dialect and ensure sslmode=require
+    # Convert postgres/postgresql scheme to asyncpg async dialect for SQLAlchemy
+    # Use asyncpg as it's more efficient for async operations
     if not sync_url:
         return sync_url
     parts = urlsplit(sync_url)
     scheme = parts.scheme
-    if scheme.startswith("postgres"):
+    
+    # Remove any existing driver prefix (postgresql+psycopg, postgresql+asyncpg, etc.)
+    if "+" in scheme:
+        base_scheme = scheme.split("+")[0]
+    else:
+        base_scheme = scheme
+    
+    if base_scheme.startswith("postgres"):
         # Rebuild query: enforce sslmode=require, drop driver-specific leftovers
         query_pairs = dict(parse_qsl(parts.query, keep_blank_values=True))
         query_pairs.pop("options", None)
-        query_pairs.setdefault("sslmode", "require")
+        # Don't force sslmode for Railway - let it use what's in the URL
+        # Some providers already have sslmode configured
+        if "sslmode" not in query_pairs:
+            query_pairs["sslmode"] = "require"
         new_query = urlencode(query_pairs)
-        # swap scheme to psycopg3 driver
-        new_scheme = "postgresql+psycopg"
+        # Use asyncpg driver for async operations
+        new_scheme = "postgresql+asyncpg"
         new_parts = (new_scheme, parts.netloc, parts.path, new_query, parts.fragment)
         return urlunsplit(new_parts)
     return sync_url
@@ -94,21 +106,37 @@ async def healthz():
     # Always return 200 for Railway healthcheck, but include DB status
     db_status = "ok"
     db_error = None
+    db_error_type = None
+    
     try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        db_status = "ok"
+        # Check if DATABASE_URL is set
+        if not DATABASE_URL:
+            db_status = "error"
+            db_error = "DATABASE_URL environment variable is not set"
+            db_error_type = "config_error"
+        else:
+            # Try to connect and execute a simple query
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            db_status = "ok"
     except Exception as e:
         db_status = "error"
-        db_error = repr(e)
+        db_error = str(e)
+        db_error_type = type(e).__name__
+        # Full error trace available for logging (not exposed in response for security)
     
     # Return 200 so Railway doesn't fail deployment, but indicate DB status
-    return {
+    response = {
         "status": "ok",
         "app": "running",
         "database": db_status,
-        "error": db_error if db_error else None
     }
+    
+    if db_error:
+        response["error"] = db_error
+        response["error_type"] = db_error_type
+    
+    return response
 
 
 @app.post("/sendWeekly")
