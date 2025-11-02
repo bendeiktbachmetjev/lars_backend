@@ -76,10 +76,28 @@ def _build_async_url(sync_url: str) -> str:
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL env var is required")
+# Don't fail on startup if DATABASE_URL is missing - allow app to start
+# and report error in healthcheck instead
 
-ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
+ASYNC_DATABASE_URL = None
+engine: AsyncEngine = None
+async_session = None
+
+if DATABASE_URL:
+    try:
+        ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
+        engine: AsyncEngine = create_async_engine(
+            ASYNC_DATABASE_URL,
+            pool_pre_ping=True,
+            connect_args={
+                # psycopg3: disable server-side prepares to work with PgBouncer transaction/statement mode
+                "prepare_threshold": 0,
+            },
+        )
+        async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+    except Exception as e:
+        # Log error but don't crash on startup
+        print(f"Warning: Failed to initialize database engine: {e}")
 
 def _ssl_hint() -> str:
     ca_path_env = os.getenv("SUPABASE_CA_PATH") or str((pathlib.Path(__file__).resolve().parent / "certs" / "supabase-ca.pem"))
@@ -87,16 +105,6 @@ def _ssl_hint() -> str:
         "If TLS fails: download Supabase CA (Database → Settings → SSL → Download certificate) "
         f"and set sslrootcert in DATABASE_URL or SUPABASE_CA_PATH at {ca_path_env}."
     )
-
-engine: AsyncEngine = create_async_engine(
-    ASYNC_DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args={
-        # psycopg3: disable server-side prepares to work with PgBouncer transaction/statement mode
-        "prepare_threshold": 0,
-    },
-)
-async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
 app = FastAPI(title="LARS Backend")
 
@@ -114,6 +122,10 @@ async def healthz():
             db_status = "error"
             db_error = "DATABASE_URL environment variable is not set"
             db_error_type = "config_error"
+        elif engine is None:
+            db_status = "error"
+            db_error = "Database engine not initialized"
+            db_error_type = "initialization_error"
         else:
             # Try to connect and execute a simple query
             async with engine.connect() as conn:
@@ -139,6 +151,11 @@ async def healthz():
     return response
 
 
+@app.get("/")
+async def root():
+    # Simple root endpoint to verify app is running
+    return {"status": "ok", "message": "LARS Backend API"}
+
 @app.post("/sendWeekly")
 async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = Header(None)):
     if not x_patient_code:
@@ -148,6 +165,9 @@ async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = He
     if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
         raise HTTPException(status_code=400, detail="Invalid patient code format")
 
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
     try:
         async with async_session() as session:
             async with session.begin():
@@ -211,6 +231,9 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
     if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
         raise HTTPException(status_code=400, detail="Invalid patient code format")
 
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
     try:
         async with async_session() as session:
             async with session.begin():
@@ -267,6 +290,9 @@ async def send_monthly(payload: MonthlyPayload, x_patient_code: Optional[str] = 
     if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
         raise HTTPException(status_code=400, detail="Invalid patient code format")
 
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
     try:
         async with async_session() as session:
             async with session.begin():
@@ -316,6 +342,9 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
     if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
         raise HTTPException(status_code=400, detail="Invalid patient code format")
 
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
     try:
         async with async_session() as session:
             async with session.begin():
