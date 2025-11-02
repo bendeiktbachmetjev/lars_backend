@@ -90,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 18),
                       const Text(
-                        'Larry Patient',
+                        'iLars Patient',
                         style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                         textAlign: TextAlign.center,
                       ),

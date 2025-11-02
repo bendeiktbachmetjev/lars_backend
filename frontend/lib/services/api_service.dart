@@ -94,4 +94,51 @@ class ApiService {
     });
     return http.post(uri, headers: _headers(patientCode), body: body);
   }
+
+  Future<http.Response> sendEq5d5l({
+    required String patientCode,
+    required int mobility,
+    required int selfCare,
+    required int usualActivities,
+    required int painDiscomfort,
+    required int anxietyDepression,
+    String? entryDate,
+    Map<String, dynamic>? rawData,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/sendEq5d5l');
+    final body = jsonEncode({
+      'mobility': mobility,
+      'self_care': selfCare,
+      'usual_activities': usualActivities,
+      'pain_discomfort': painDiscomfort,
+      'anxiety_depression': anxietyDepression,
+      'entry_date': entryDate,
+      'raw_data': rawData,
+    });
+    return http.post(uri, headers: _headers(patientCode), body: body);
+  }
+
+  Future<Map<String, dynamic>> getLarsData({
+    required String patientCode,
+    required String period, // "weekly", "monthly", or "yearly"
+  }) async {
+    final uri = Uri.parse('$_baseUrl/getLarsData?period=$period');
+    try {
+      final response = await http.get(uri, headers: _headers(patientCode));
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        // Return even if data array is empty - that's valid (no data yet)
+        return decoded;
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Re-throw with more context, but don't fail if it's a network issue
+      if (e.toString().contains('Exception')) {
+        rethrow;
+      }
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
 }

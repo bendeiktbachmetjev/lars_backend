@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class MonthlyQuestionnaireScreen extends StatefulWidget {
   const MonthlyQuestionnaireScreen({super.key});
@@ -152,8 +153,52 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 0,
                       ),
-                      onPressed: () {
-                        // TODO: Implement submit logic
+                      onPressed: () async {
+                        final api = ApiService();
+                        final code = await api.getPatientCode();
+                        if (code == null || code.isEmpty) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please set your patient code in Profile')),
+                          );
+                          return;
+                        }
+
+                        final overall = ((control + satisfaction) / 2).round();
+                        final raw = {
+                          'avoid_travel': avoidTravel,
+                          'avoid_social': avoidSocial,
+                          'embarrassed': embarrassed,
+                          'worry_notice': worryNotice,
+                          'depressed': depressed,
+                          'control': control,
+                          'satisfaction': satisfaction,
+                        };
+
+                        try {
+                          final resp = await api.sendMonthly(
+                            patientCode: code,
+                            qolScore: overall,
+                            rawData: raw,
+                          );
+                          if (resp.statusCode >= 200 && resp.statusCode < 300) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Submitted successfully')),
+                            );
+                            Navigator.of(context).pop();
+                          } else {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Submit failed: ${resp.statusCode}')),
+                            );
+                          }
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
                       },
                       child: const Text('Submit'),
                     ),

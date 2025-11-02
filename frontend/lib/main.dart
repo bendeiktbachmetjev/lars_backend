@@ -60,7 +60,7 @@ class _HomePageState extends State<HomePage> {
             ).createShader(bounds);
           },
           child: const Text(
-            'Larry',
+            'iLars',
             style: TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.w900,

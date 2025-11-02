@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/bristol_scale_selector.dart';
+import '../services/api_service.dart';
 import '../widgets/food_consumption_selector.dart';
 import '../widgets/drink_consumption_selector.dart';
 
@@ -400,8 +401,55 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 0,
                       ),
-                      onPressed: () {
-                        // TODO: Implement submit logic
+                      onPressed: () async {
+                        final api = ApiService();
+                        final code = await api.getPatientCode();
+                        if (code == null || code.isEmpty) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please set your patient code in Profile')),
+                          );
+                          return;
+                        }
+
+                        final raw = {
+                          'stool_count': stoolCount,
+                          'pads_used': padsUsed,
+                          'urgency': urgency,
+                          'night_stools': nightStools,
+                          'leakage': leakage,
+                          'incomplete_evacuation': incompleteEvac,
+                          'bloating': bloating,
+                          'impact_score': impactScore,
+                          'activity_interfere': activityInterfere,
+                        };
+
+                        try {
+                          final resp = await api.sendDaily(
+                            patientCode: code,
+                            bristolScale: bristolScale,
+                            foodConsumption: consumedFoodItems,
+                            drinkConsumption: consumedDrinkItems,
+                            rawData: raw,
+                          );
+                          if (resp.statusCode >= 200 && resp.statusCode < 300) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Submitted successfully')),
+                            );
+                            Navigator.of(context).pop();
+                          } else {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Submit failed: ${resp.statusCode}')),
+                            );
+                          }
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
                       },
                       child: const Text('Submit'),
                     ),

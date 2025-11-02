@@ -510,3 +510,112 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
             status_code=500, 
             content={"status": "error", "detail": error_msg, "error_type": error_type}
         )
+
+
+@app.get("/getLarsData")
+async def get_lars_data(
+    period: str,  # "weekly", "monthly", or "yearly"
+    x_patient_code: Optional[str] = Header(None)
+):
+    """
+    Get LARS score data for a patient grouped by time period.
+    Returns data points with entry_date and total_score for the specified period.
+    """
+    if not x_patient_code:
+        raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
+    patient_code = x_patient_code.strip().upper()
+    if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
+        raise HTTPException(status_code=400, detail="Invalid patient code format")
+
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    # Validate period
+    if period not in ["weekly", "monthly", "yearly"]:
+        raise HTTPException(status_code=400, detail="Invalid period. Must be 'weekly', 'monthly', or 'yearly'")
+    
+    try:
+        async with async_session() as session:
+            # Get patient_id
+            patient_res = await session.execute(
+                text("SELECT id FROM patients WHERE patient_code = :code").bindparams(code=patient_code)
+            )
+            patient_row = patient_res.first()
+            if not patient_row:
+                return {"status": "ok", "data": []}
+            
+            patient_id = patient_row[0]
+            
+            # Build SQL query based on period
+            # For weekly: group by week
+            # For monthly: group by month
+            # For yearly: group by year
+            if period == "weekly":
+                # Get last 5 weeks of data, grouped by week
+                # Show all data if there's less than 5 weeks worth
+                query = text("""
+                    SELECT 
+                        DATE_TRUNC('week', entry_date) as period_start,
+                        AVG(total_score)::INTEGER as avg_score,
+                        MIN(entry_date) as first_entry_date
+                    FROM weekly_entries
+                    WHERE patient_id = :patient_id 
+                        AND total_score IS NOT NULL
+                    GROUP BY DATE_TRUNC('week', entry_date)
+                    ORDER BY period_start DESC
+                    LIMIT 5
+                """)
+            elif period == "monthly":
+                # Get last 6 months of data, grouped by month
+                query = text("""
+                    SELECT 
+                        DATE_TRUNC('month', entry_date) as period_start,
+                        AVG(total_score)::INTEGER as avg_score,
+                        MIN(entry_date) as first_entry_date
+                    FROM weekly_entries
+                    WHERE patient_id = :patient_id 
+                        AND total_score IS NOT NULL
+                        AND entry_date >= CURRENT_DATE - INTERVAL '6 months'
+                    GROUP BY DATE_TRUNC('month', entry_date)
+                    ORDER BY period_start ASC
+                """)
+            else:  # yearly
+                # Get last 5 years of data, grouped by year
+                query = text("""
+                    SELECT 
+                        DATE_TRUNC('year', entry_date) as period_start,
+                        AVG(total_score)::INTEGER as avg_score,
+                        MIN(entry_date) as first_entry_date
+                    FROM weekly_entries
+                    WHERE patient_id = :patient_id 
+                        AND total_score IS NOT NULL
+                        AND entry_date >= CURRENT_DATE - INTERVAL '5 years'
+                    GROUP BY DATE_TRUNC('year', entry_date)
+                    ORDER BY period_start ASC
+                """)
+            
+            result = await session.execute(query.bindparams(patient_id=patient_id))
+            rows = result.fetchall()
+            
+            # Reverse if ordered DESC to get chronological order
+            if period == "weekly" and rows:
+                rows = list(reversed(rows))
+            
+            data = []
+            for idx, row in enumerate(rows, start=1):
+                data.append({
+                    "index": idx,
+                    "date": row[2].isoformat() if row[2] else None,  # first_entry_date
+                    "score": row[1] if row[1] is not None else None  # avg_score
+                })
+            
+            return {"status": "ok", "data": data}
+    except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Error in getLarsData: {error_type}: {error_msg}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
+        )
