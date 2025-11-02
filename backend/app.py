@@ -4,7 +4,7 @@ import traceback
 from typing import Optional
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
@@ -44,7 +44,14 @@ class Eq5d5lPayload(BaseModel):
     raw_data: Optional[dict] = None
 
 
-app = FastAPI()
+app = FastAPI(
+    title="LARS Backend API",
+    description="Backend API for LARS questionnaire application",
+    version="1.0.0"
+)
+
+# Print startup info
+print("FastAPI app created")
 
 
 def _build_async_url(sync_url: str) -> str:
@@ -112,9 +119,13 @@ if DATABASE_URL:
         
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
+        print(f"Database URL: {DATABASE_URL[:50]}..." if len(DATABASE_URL) > 50 else f"Database URL: {DATABASE_URL}")
     except Exception as e:
         print(f"Warning: Failed to initialize database engine: {e}")
         traceback.print_exc()
+        # Continue without database - endpoints will return 503
+
+print("App module initialization complete")
 
 
 @app.get("/healthz")
@@ -673,8 +684,8 @@ async def get_next_questionnaire(
 
 @app.get("/getLarsData")
 async def get_lars_data(
-    period: str,  # "weekly", "monthly", or "yearly"
-    x_patient_code: Optional[str] = Header(None)
+    period: str = Query(..., description="Time period: weekly, monthly, or yearly"),
+    x_patient_code: Optional[str] = Header(None, alias="X-Patient-Code")
 ):
     """
     Get LARS score data for a patient grouped by time period.
