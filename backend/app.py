@@ -599,10 +599,10 @@ async def get_next_questionnaire(
             else:
                 last_monthly_date = monthly_row[0]
                 # Check if last monthly entry was more than 30 days ago
-                # Use EXTRACT to get days difference
+                # Direct date subtraction returns days as integer
                 days_check = await session.execute(
                     text("""
-                        SELECT EXTRACT(DAY FROM (CURRENT_DATE - :last_date))::INTEGER as days_diff
+                        SELECT (CURRENT_DATE - :last_date)::INTEGER as days_diff
                     """).bindparams(last_date=last_monthly_date)
                 )
                 days_diff = days_check.first()[0]
@@ -614,7 +614,7 @@ async def get_next_questionnaire(
             
             # Check if weekly questionnaire is needed (once per week)
             # Get last weekly entry date
-            weekly_check = await session.execute(
+            weekly_last_check = await session.execute(
                 text("""
                     SELECT entry_date FROM weekly_entries 
                     WHERE patient_id = :patient_id 
@@ -622,7 +622,7 @@ async def get_next_questionnaire(
                     LIMIT 1
                 """).bindparams(patient_id=patient_id)
             )
-            weekly_row = weekly_check.first()
+            weekly_row = weekly_last_check.first()
             
             needs_weekly = False
             if weekly_row is None:
@@ -631,10 +631,10 @@ async def get_next_questionnaire(
             else:
                 last_weekly_date = weekly_row[0]
                 # Check if last weekly entry was more than 7 days ago
-                # Use EXTRACT to get days difference
+                # Direct date subtraction returns days as integer
                 days_check = await session.execute(
                     text("""
-                        SELECT EXTRACT(DAY FROM (CURRENT_DATE - :last_date))::INTEGER as days_diff
+                        SELECT (CURRENT_DATE - :last_date)::INTEGER as days_diff
                     """).bindparams(last_date=last_weekly_date)
                 )
                 days_diff = days_check.first()[0]
