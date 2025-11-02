@@ -1,18 +1,10 @@
 import os
 import json
 import traceback
-import logging
 from typing import Optional
 from urllib.parse import urlsplit
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, AsyncSession
@@ -52,14 +44,7 @@ class Eq5d5lPayload(BaseModel):
     raw_data: Optional[dict] = None
 
 
-app = FastAPI(
-    title="LARS Backend API",
-    description="Backend API for LARS questionnaire application",
-    version="1.0.0"
-)
-
-# Log startup info
-logger.info("FastAPI app created")
+app = FastAPI()
 
 
 def _build_async_url(sync_url: str) -> str:
@@ -100,11 +85,11 @@ if DATABASE_URL:
         # Заменяем :6543 на :5432 если используется pooler
         if ":6543" in DATABASE_URL:
             DATABASE_URL = DATABASE_URL.replace(":6543", ":5432")
-            logger.info("Switched from Transaction Pooler (6543) to Session Pooler (5432) for prepared statements support")
+            print("Switched from Transaction Pooler (6543) to Session Pooler (5432) for prepared statements support")
         elif ".pooler.supabase.com" in DATABASE_URL and ":5432" not in DATABASE_URL:
             # Если pooler, но порт не указан явно - добавляем 5432
             DATABASE_URL = DATABASE_URL.replace(".pooler.supabase.com", ".pooler.supabase.com:5432")
-            logger.info("Added Session Pooler port (5432) for prepared statements support")
+            print("Added Session Pooler port (5432) for prepared statements support")
         
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
@@ -126,26 +111,16 @@ if DATABASE_URL:
         )
         
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
-        logger.info("Database engine initialized successfully")
-        db_url_display = DATABASE_URL[:50] + "..." if len(DATABASE_URL) > 50 else DATABASE_URL
-        logger.info(f"Database URL configured: {db_url_display}")
+        print("Database engine initialized successfully")
     except Exception as e:
-        logger.warning(f"Failed to initialize database engine: {e}")
-        logger.warning(traceback.format_exc())
-        # Continue without database - endpoints will return 503
-
-logger.info("App module initialization complete")
+        print(f"Warning: Failed to initialize database engine: {e}")
+        traceback.print_exc()
 
 
 @app.get("/healthz")
 async def healthcheck():
-    """Health check endpoint for Railway deployment"""
     db_status = "ok" if engine else "not_configured"
-    return {
-        "status": "ok",
-        "database": db_status,
-        "app": "running"
-    }
+    return {"status": "ok", "database": db_status}
 
 
 @app.post("/sendWeekly")
@@ -216,7 +191,7 @@ async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = He
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        logger.error(f"Error in sendWeekly: {error_type}: {error_msg}")
+        print(f"Error in sendWeekly: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
@@ -378,7 +353,7 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        logger.error(f"Error in sendDaily: {error_type}: {error_msg}")
+        print(f"Error in sendDaily: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
@@ -462,7 +437,7 @@ async def send_monthly(payload: MonthlyPayload, x_patient_code: Optional[str] = 
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        logger.error(f"Error in sendMonthly: {error_type}: {error_msg}")
+        print(f"Error in sendMonthly: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
@@ -529,7 +504,7 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        logger.error(f"Error in sendEq5d5l: {error_type}: {error_msg}")
+        print(f"Error in sendEq5d5l: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
@@ -537,169 +512,10 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
         )
 
 
-@app.get("/getNextQuestionnaire")
-async def get_next_questionnaire(
-    x_patient_code: Optional[str] = Header(None)
-):
-    """
-    Determine which questionnaire should be filled today for a patient.
-    Returns:
-    - "daily" if daily questionnaire should be filled
-    - "weekly" if weekly questionnaire should be filled (instead of daily, once per week)
-    - "monthly" if monthly questionnaire should be filled (instead of daily/weekly, once per month)
-    - "none" if today's questionnaire is already filled
-    
-    Priority: monthly > weekly > daily
-    """
-    if not x_patient_code:
-        raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
-    patient_code = x_patient_code.strip().upper()
-    if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
-        raise HTTPException(status_code=400, detail="Invalid patient code format")
-
-    if not async_session:
-        raise HTTPException(status_code=503, detail="Database not configured")
-    
-    try:
-        async with async_session() as session:
-            # Get patient_id - ensure patient exists
-            patient_res = await session.execute(
-                text("SELECT id FROM patients WHERE patient_code = :code").bindparams(code=patient_code)
-            )
-            patient_row = patient_res.first()
-            if not patient_row:
-                # New patient - start with daily
-                logger.info(f"getNextQuestionnaire: Patient with code {patient_code} not found, returning 'daily'")
-                return {"status": "ok", "type": "daily"}
-            
-            patient_id = patient_row[0]
-            logger.info(f"getNextQuestionnaire: Found patient_id={patient_id} for code={patient_code}")
-            
-            # Check if any questionnaire for today already exists
-            # (daily, weekly, or monthly - any of them means today is filled)
-            daily_check = await session.execute(
-                text("""
-                    SELECT id FROM daily_entries 
-                    WHERE patient_id = :patient_id AND entry_date = CURRENT_DATE
-                    LIMIT 1
-                """).bindparams(patient_id=patient_id)
-            )
-            weekly_check = await session.execute(
-                text("""
-                    SELECT id FROM weekly_entries 
-                    WHERE patient_id = :patient_id AND entry_date = CURRENT_DATE
-                    LIMIT 1
-                """).bindparams(patient_id=patient_id)
-            )
-            monthly_today_check = await session.execute(
-                text("""
-                    SELECT id FROM monthly_entries 
-                    WHERE patient_id = :patient_id AND entry_date = CURRENT_DATE
-                    LIMIT 1
-                """).bindparams(patient_id=patient_id)
-            )
-            
-            has_daily = daily_check.first() is not None
-            has_weekly = weekly_check.first() is not None
-            has_monthly = monthly_today_check.first() is not None
-            has_any_today = has_daily or has_weekly or has_monthly
-            
-            logger.info(f"getNextQuestionnaire: Today's entries - daily={has_daily}, weekly={has_weekly}, monthly={has_monthly}")
-            
-            if has_any_today:
-                # Today's questionnaire is already filled
-                logger.info(f"getNextQuestionnaire: Today's questionnaire already filled, returning 'none'")
-                return {"status": "ok", "type": "none"}
-            
-            # Check if monthly questionnaire is needed (once per month)
-            # Get last monthly entry date
-            monthly_last_check = await session.execute(
-                text("""
-                    SELECT entry_date FROM monthly_entries 
-                    WHERE patient_id = :patient_id 
-                    ORDER BY entry_date DESC 
-                    LIMIT 1
-                """).bindparams(patient_id=patient_id)
-            )
-            monthly_row = monthly_last_check.first()
-            
-            needs_monthly = False
-            if monthly_row is None:
-                # Never filled monthly - need it
-                needs_monthly = True
-            else:
-                last_monthly_date = monthly_row[0]
-                # Check if last monthly entry was more than 30 days ago
-                # Direct date subtraction returns days as integer
-                days_check = await session.execute(
-                    text("""
-                        SELECT (CURRENT_DATE - :last_date)::INTEGER as days_diff
-                    """).bindparams(last_date=last_monthly_date)
-                )
-                days_diff = days_check.first()[0]
-                if days_diff >= 30:
-                    needs_monthly = True
-            
-            if needs_monthly:
-                logger.info(f"getNextQuestionnaire: Monthly questionnaire needed, returning 'monthly'")
-                return {"status": "ok", "type": "monthly"}
-            
-            # Check if weekly questionnaire is needed (once per week)
-            # Get last weekly entry date
-            weekly_last_check = await session.execute(
-                text("""
-                    SELECT entry_date FROM weekly_entries 
-                    WHERE patient_id = :patient_id 
-                    ORDER BY entry_date DESC 
-                    LIMIT 1
-                """).bindparams(patient_id=patient_id)
-            )
-            weekly_row = weekly_last_check.first()
-            
-            needs_weekly = False
-            if weekly_row is None:
-                # Never filled weekly - need it
-                needs_weekly = True
-            else:
-                last_weekly_date = weekly_row[0]
-                # Check if last weekly entry was more than 7 days ago
-                # Direct date subtraction returns days as integer
-                days_check = await session.execute(
-                    text("""
-                        SELECT (CURRENT_DATE - :last_date)::INTEGER as days_diff
-                    """).bindparams(last_date=last_weekly_date)
-                )
-                days_diff = days_check.first()[0]
-                if days_diff >= 7:
-                    needs_weekly = True
-            
-            if needs_weekly:
-                logger.info(f"getNextQuestionnaire: Weekly questionnaire needed, returning 'weekly'")
-                return {"status": "ok", "type": "weekly"}
-            
-            # Default: daily questionnaire
-            logger.info(f"getNextQuestionnaire: Default to daily questionnaire")
-            return {"status": "ok", "type": "daily"}
-            
-    except HTTPException:
-        # Re-raise HTTP exceptions (400, 503, etc.)
-        raise
-    except Exception as e:
-        error_msg = str(e)
-        error_type = type(e).__name__
-        logger.error(f"Error in getNextQuestionnaire: {error_type}: {error_msg}")
-        traceback.print_exc()
-        # Return 500 instead of raising to avoid 502 from gateway
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "detail": error_msg, "error_type": error_type}
-        )
-
-
 @app.get("/getLarsData")
 async def get_lars_data(
-    period: str = Query(..., description="Time period: weekly, monthly, or yearly"),
-    x_patient_code: Optional[str] = Header(None, alias="X-Patient-Code")
+    period: str,  # "weekly", "monthly", or "yearly"
+    x_patient_code: Optional[str] = Header(None)
 ):
     """
     Get LARS score data for a patient grouped by time period.
@@ -720,17 +536,15 @@ async def get_lars_data(
     
     try:
         async with async_session() as session:
-            # Get patient_id - ensure patient exists
+            # Get patient_id
             patient_res = await session.execute(
                 text("SELECT id FROM patients WHERE patient_code = :code").bindparams(code=patient_code)
             )
             patient_row = patient_res.first()
             if not patient_row:
-                logger.info(f"getLarsData: Patient with code {patient_code} not found, returning empty data")
                 return {"status": "ok", "data": []}
             
             patient_id = patient_row[0]
-            logger.info(f"getLarsData: Found patient_id={patient_id} for code={patient_code}, period={period}")
             
             # Build SQL query based on period
             # For weekly: group by week
@@ -795,17 +609,12 @@ async def get_lars_data(
                     "score": row[1] if row[1] is not None else None  # avg_score
                 })
             
-            logger.info(f"getLarsData: Returning {len(data)} data points")
             return {"status": "ok", "data": data}
-    except HTTPException:
-        # Re-raise HTTP exceptions (400, 503, etc.)
-        raise
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        logger.error(f"Error in getLarsData: {error_type}: {error_msg}")
+        print(f"Error in getLarsData: {error_type}: {error_msg}")
         traceback.print_exc()
-        # Return 500 instead of raising to avoid 502 from gateway
         return JSONResponse(
             status_code=500,
             content={"status": "error", "detail": error_msg, "error_type": error_type}

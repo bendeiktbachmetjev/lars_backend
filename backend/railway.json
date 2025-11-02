@@ -7,7 +7,7 @@
     "restartPolicyType": "ON_FAILURE",
     "healthcheckPath": "/healthz",
     "healthcheckTimeout": 100,
-    "startCommand": "python3 startup.py"
+    "startCommand": "python startup.py"
   },
   "envVars": {
     "DATABASE_URL": {
