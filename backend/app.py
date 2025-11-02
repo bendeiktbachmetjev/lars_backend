@@ -3,6 +3,7 @@ import json
 import traceback
 from typing import Optional
 from urllib.parse import urlsplit
+from datetime import date, timedelta
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
@@ -42,6 +43,9 @@ class Eq5d5lPayload(BaseModel):
     anxiety_depression: int
     entry_date: Optional[str] = None
     raw_data: Optional[dict] = None
+
+class SetSurgeryDatePayload(BaseModel):
+    surgery_date: str  # ISO format date string YYYY-MM-DD
 
 
 app = FastAPI()
@@ -614,6 +618,313 @@ async def get_lars_data(
         error_msg = str(e)
         error_type = type(e).__name__
         print(f"Error in getLarsData: {error_type}: {error_msg}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
+        )
+
+
+@app.post("/setSurgeryDate")
+async def set_surgery_date(payload: SetSurgeryDatePayload, x_patient_code: Optional[str] = Header(None)):
+    """
+    Set or update surgery date for a patient.
+    This is used to schedule EQ5D5L questionnaires at specific intervals.
+    """
+    if not x_patient_code:
+        raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
+    patient_code = x_patient_code.strip().upper()
+    if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
+        raise HTTPException(status_code=400, detail="Invalid patient code format")
+
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                # Create or get patient
+                res = await session.execute(
+                    text("""
+                        INSERT INTO patients (patient_code, surgery_date)
+                        VALUES (:code, CAST(:surgery_date AS DATE))
+                        ON CONFLICT (patient_code) DO UPDATE SET
+                            surgery_date = CAST(:surgery_date AS DATE)
+                        RETURNING id, surgery_date
+                    """).bindparams(code=patient_code, surgery_date=payload.surgery_date)
+                )
+                row = res.first()
+                return {"status": "ok", "surgery_date": row[1].isoformat() if row[1] else None}
+    except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Error in setSurgeryDate: {error_type}: {error_msg}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg, "error_type": error_type}
+        )
+
+
+@app.get("/getNextQuestionnaire")
+async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
+    """
+    Determine which questionnaire should be shown to the patient today.
+    
+    Priority order:
+    1. EQ5D5L - if due based on surgery date (pre-op, 2 weeks, 1 month, 3 months, 6 months, 12 months)
+    2. Weekly (LARS) - must be filled once per week
+    3. Monthly - must be filled once per month, but not on the same day as Weekly
+    4. Daily - can be filled daily, but only if no other questionnaire is due
+    
+    Returns:
+    {
+        "questionnaire_type": "daily" | "weekly" | "monthly" | "eq5d5l" | null,
+        "is_due": bool,
+        "reason": string (optional explanation),
+        "priority": int (1-4, lower is higher priority)
+    }
+    """
+    if not x_patient_code:
+        raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
+    patient_code = x_patient_code.strip().upper()
+    if not patient_code or len(patient_code) < 4 or len(patient_code) > 64:
+        raise HTTPException(status_code=400, detail="Invalid patient code format")
+
+    if not async_session:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    
+    try:
+        async with async_session() as session:
+            # Get patient info
+            patient_res = await session.execute(
+                text("""
+                    SELECT id, surgery_date 
+                    FROM patients 
+                    WHERE patient_code = :code
+                """).bindparams(code=patient_code)
+            )
+            patient_row = patient_res.first()
+            if not patient_row:
+                return {"status": "ok", "questionnaire_type": None, "is_due": False, "reason": "Patient not found"}
+            
+            patient_id = patient_row[0]
+            surgery_date = patient_row[1]
+            
+            # Get current date
+            today_res = await session.execute(text("SELECT CURRENT_DATE"))
+            today = today_res.scalar()
+            
+            # Check EQ5D5L scheduling (highest priority)
+            eq5d5l_due = None
+            eq5d5l_reason = None
+            if surgery_date:
+                # Normalize today to date object
+                if isinstance(today, str):
+                    today = date.fromisoformat(today)
+                elif hasattr(today, 'date'):
+                    today = today.date()
+                
+                if isinstance(surgery_date, str):
+                    surgery_date_obj = date.fromisoformat(str(surgery_date))
+                elif hasattr(surgery_date, 'date'):
+                    surgery_date_obj = surgery_date.date()
+                else:
+                    surgery_date_obj = surgery_date
+                
+                # Check if EQ5D5L is due
+                eq5d5l_check = await session.execute(
+                    text("""
+                        SELECT entry_date 
+                        FROM eq5d5l_entries 
+                        WHERE patient_id = :patient_id 
+                        ORDER BY entry_date DESC 
+                        LIMIT 1
+                    """).bindparams(patient_id=patient_id)
+                )
+                last_eq5d5l = eq5d5l_check.first()
+                last_eq5d5l_date = last_eq5d5l[0] if last_eq5d5l else None
+                
+                # Define EQ5D5L milestones
+                milestones = [
+                    ("pre-op", surgery_date_obj - timedelta(days=1)),  # Pre-operative (day before surgery)
+                    ("2_weeks", surgery_date_obj + timedelta(days=14)),
+                    ("1_month", surgery_date_obj + timedelta(days=30)),
+                    ("3_months", surgery_date_obj + timedelta(days=90)),
+                    ("6_months", surgery_date_obj + timedelta(days=180)),
+                    ("12_months", surgery_date_obj + timedelta(days=365)),
+                ]
+                
+                for milestone_name, milestone_date in milestones:
+                    # Check if we're within the window for this milestone (±3 days tolerance)
+                    days_diff = (today - milestone_date).days
+                    if abs(days_diff) <= 3:
+                        # Check if this milestone was already completed
+                        milestone_completed = False
+                        if last_eq5d5l_date:
+                            if isinstance(last_eq5d5l_date, str):
+                                last_date = date.fromisoformat(str(last_eq5d5l_date))
+                            else:
+                                last_date = last_eq5d5l_date
+                            # Check if there's an entry within 7 days of this milestone
+                            if abs((last_date - milestone_date).days) <= 7:
+                                milestone_completed = True
+                        
+                        if not milestone_completed:
+                            eq5d5l_due = True
+                            eq5d5l_reason = f"EQ5D5L due: {milestone_name.replace('_', ' ')} milestone"
+                            break
+            
+            if eq5d5l_due:
+                return {
+                    "status": "ok",
+                    "questionnaire_type": "eq5d5l",
+                    "is_due": True,
+                    "reason": eq5d5l_reason,
+                    "priority": 1
+                }
+            
+            # Check Weekly (LARS) - must be filled once per week
+            weekly_check = await session.execute(
+                text("""
+                    SELECT entry_date 
+                    FROM weekly_entries 
+                    WHERE patient_id = :patient_id 
+                    ORDER BY entry_date DESC 
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            last_weekly = weekly_check.first()
+            last_weekly_date = last_weekly[0] if last_weekly else None
+            
+            weekly_due = False
+            if last_weekly_date:
+                if isinstance(last_weekly_date, str):
+                    last_weekly_date_obj = date.fromisoformat(str(last_weekly_date))
+                elif hasattr(last_weekly_date, 'date'):
+                    last_weekly_date_obj = last_weekly_date.date()
+                else:
+                    last_weekly_date_obj = last_weekly_date
+                days_since_weekly = (today - last_weekly_date_obj).days
+                # Weekly is due if last entry was 7 or more days ago
+                weekly_due = days_since_weekly >= 7
+            else:
+                # Never filled weekly - it's due
+                weekly_due = True
+            
+            # Check Monthly - must be filled once per month, but not same day as Weekly
+            monthly_check = await session.execute(
+                text("""
+                    SELECT entry_date 
+                    FROM monthly_entries 
+                    WHERE patient_id = :patient_id 
+                    ORDER BY entry_date DESC 
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            last_monthly = monthly_check.first()
+            last_monthly_date = last_monthly[0] if last_monthly else None
+            
+            monthly_due = False
+            if last_monthly_date:
+                if isinstance(last_monthly_date, str):
+                    last_monthly_date_obj = date.fromisoformat(str(last_monthly_date))
+                elif hasattr(last_monthly_date, 'date'):
+                    last_monthly_date_obj = last_monthly_date.date()
+                else:
+                    last_monthly_date_obj = last_monthly_date
+                # Check if more than 30 days passed
+                days_since_monthly = (today - last_monthly_date_obj).days
+                monthly_due = days_since_monthly >= 30
+            else:
+                # Never filled monthly - it's due
+                monthly_due = True
+            
+            # If both weekly and monthly are due, check if weekly was filled today
+            # If weekly was NOT filled today, show weekly first. If it was, show monthly.
+            # Also check if last weekly was filled on a different day than today
+            weekly_today_filled = False
+            if last_weekly_date:
+                if isinstance(last_weekly_date, str):
+                    last_weekly_date_obj = date.fromisoformat(str(last_weekly_date))
+                elif hasattr(last_weekly_date, 'date'):
+                    last_weekly_date_obj = last_weekly_date.date()
+                else:
+                    last_weekly_date_obj = last_weekly_date
+                weekly_today_filled = (last_weekly_date_obj == today)
+            
+            # If both are due and weekly was already filled today, show monthly
+            if weekly_due and monthly_due:
+                if weekly_today_filled:
+                    return {
+                        "status": "ok",
+                        "questionnaire_type": "monthly",
+                        "is_due": True,
+                        "reason": "Monthly questionnaire due (once per month)",
+                        "priority": 3
+                    }
+                else:
+                    # Weekly hasn't been filled today, prioritize it
+                    return {
+                        "status": "ok",
+                        "questionnaire_type": "weekly",
+                        "is_due": True,
+                        "reason": "Weekly LARS questionnaire due (once per week)",
+                        "priority": 2
+                    }
+            
+            if weekly_due:
+                return {
+                    "status": "ok",
+                    "questionnaire_type": "weekly",
+                    "is_due": True,
+                    "reason": "Weekly LARS questionnaire due (once per week)",
+                    "priority": 2
+                }
+            
+            if monthly_due:
+                return {
+                    "status": "ok",
+                    "questionnaire_type": "monthly",
+                    "is_due": True,
+                    "reason": "Monthly questionnaire due (once per month)",
+                    "priority": 3
+                }
+            
+            # Check Daily - only if no other questionnaire is due today
+            daily_check = await session.execute(
+                text("""
+                    SELECT entry_date 
+                    FROM daily_entries 
+                    WHERE patient_id = :patient_id 
+                        AND entry_date = CURRENT_DATE
+                    LIMIT 1
+                """).bindparams(patient_id=patient_id)
+            )
+            daily_filled = daily_check.first() is not None
+            
+            if not daily_filled:
+                return {
+                    "status": "ok",
+                    "questionnaire_type": "daily",
+                    "is_due": True,
+                    "reason": "Daily questionnaire not filled today",
+                    "priority": 4
+                }
+            
+            # All questionnaires are up to date
+            return {
+                "status": "ok",
+                "questionnaire_type": None,
+                "is_due": False,
+                "reason": "All questionnaires are up to date",
+                "priority": 0
+            }
+            
+    except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Error in getNextQuestionnaire: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
