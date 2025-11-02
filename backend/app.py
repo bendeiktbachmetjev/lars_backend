@@ -84,38 +84,24 @@ async_session = None
 
 if DATABASE_URL:
     try:
-        # CRITICAL: Override asyncpg dialect BEFORE creating engine
-        # This ensures statement_cache_size=0 is used for PgBouncer compatibility
-        from sqlalchemy.dialects.postgresql.asyncpg import AsyncPGDialect_asyncpg
-        
-        # Store original method
-        original_get_driver_connection = AsyncPGDialect_asyncpg.get_driver_connection
-        
-        # Override to force statement_cache_size=0
-        async def get_driver_connection_no_prepared(connection, **kwargs):
-            kwargs["statement_cache_size"] = 0  # Force disable for PgBouncer
-            return await original_get_driver_connection(connection, **kwargs)
-        
-        AsyncPGDialect_asyncpg.get_driver_connection = get_driver_connection_no_prepared
-        
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         
-        # Check if SSL is required (from original URL or environment)
+        # Check if SSL is required
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
-        # Configure engine for Supabase connection pooler (PgBouncer)
+        # Configure engine for PgBouncer transaction mode
+        # Must disable prepared statements for PgBouncer compatibility
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
             },
-            "statement_cache_size": 0,  # Disable prepared statements for PgBouncer
+            "statement_cache_size": 0,  # CRITICAL: Disable prepared statements for PgBouncer
         }
         
-        # Set SSL mode for asyncpg
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Create engine - dialect override ensures statement_cache_size=0
+        # Create engine with PgBouncer-compatible settings
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
