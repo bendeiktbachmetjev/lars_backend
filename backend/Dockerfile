@@ -21,6 +21,7 @@ EXPOSE 8000
 # - SUPABASE_CA_PATH (optional)
 
 # Use startup script that reads PORT from environment
-CMD ["python", "startup.py"]
+# Use python3 explicitly to ensure compatibility
+CMD ["python3", "startup.py"]
 
 

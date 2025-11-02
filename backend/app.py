@@ -1,8 +1,16 @@
 import os
 import json
 import traceback
+import logging
 from typing import Optional
 from urllib.parse import urlsplit
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -50,8 +58,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Print startup info
-print("FastAPI app created")
+# Log startup info
+logger.info("FastAPI app created")
 
 
 def _build_async_url(sync_url: str) -> str:
@@ -92,11 +100,11 @@ if DATABASE_URL:
         # Заменяем :6543 на :5432 если используется pooler
         if ":6543" in DATABASE_URL:
             DATABASE_URL = DATABASE_URL.replace(":6543", ":5432")
-            print("Switched from Transaction Pooler (6543) to Session Pooler (5432) for prepared statements support")
+            logger.info("Switched from Transaction Pooler (6543) to Session Pooler (5432) for prepared statements support")
         elif ".pooler.supabase.com" in DATABASE_URL and ":5432" not in DATABASE_URL:
             # Если pooler, но порт не указан явно - добавляем 5432
             DATABASE_URL = DATABASE_URL.replace(".pooler.supabase.com", ".pooler.supabase.com:5432")
-            print("Added Session Pooler port (5432) for prepared statements support")
+            logger.info("Added Session Pooler port (5432) for prepared statements support")
         
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
@@ -118,20 +126,26 @@ if DATABASE_URL:
         )
         
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
-        print("Database engine initialized successfully")
-        print(f"Database URL: {DATABASE_URL[:50]}..." if len(DATABASE_URL) > 50 else f"Database URL: {DATABASE_URL}")
+        logger.info("Database engine initialized successfully")
+        db_url_display = DATABASE_URL[:50] + "..." if len(DATABASE_URL) > 50 else DATABASE_URL
+        logger.info(f"Database URL configured: {db_url_display}")
     except Exception as e:
-        print(f"Warning: Failed to initialize database engine: {e}")
-        traceback.print_exc()
+        logger.warning(f"Failed to initialize database engine: {e}")
+        logger.warning(traceback.format_exc())
         # Continue without database - endpoints will return 503
 
-print("App module initialization complete")
+logger.info("App module initialization complete")
 
 
 @app.get("/healthz")
 async def healthcheck():
+    """Health check endpoint for Railway deployment"""
     db_status = "ok" if engine else "not_configured"
-    return {"status": "ok", "database": db_status}
+    return {
+        "status": "ok",
+        "database": db_status,
+        "app": "running"
+    }
 
 
 @app.post("/sendWeekly")
