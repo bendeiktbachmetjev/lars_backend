@@ -216,7 +216,7 @@ async def send_weekly(payload: WeeklyPayload, x_patient_code: Optional[str] = He
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        print(f"Error in sendWeekly: {error_type}: {error_msg}")
+        logger.error(f"Error in sendWeekly: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
@@ -378,7 +378,7 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        print(f"Error in sendDaily: {error_type}: {error_msg}")
+        logger.error(f"Error in sendDaily: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
@@ -462,7 +462,7 @@ async def send_monthly(payload: MonthlyPayload, x_patient_code: Optional[str] = 
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        print(f"Error in sendMonthly: {error_type}: {error_msg}")
+        logger.error(f"Error in sendMonthly: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
@@ -529,7 +529,7 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        print(f"Error in sendEq5d5l: {error_type}: {error_msg}")
+        logger.error(f"Error in sendEq5d5l: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
