@@ -620,7 +620,6 @@ async def get_lars_data(
             content={"status": "error", "detail": error_msg, "error_type": error_type}
         )
 
-
 @app.get("/getNextQuestionnaire")
 async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
     """
@@ -654,8 +653,15 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                 """).bindparams(code=patient_code)
             )
             patient_row = patient_res.first()
+            
+            # If patient doesn't exist, suggest first questionnaire (weekly) - patient will be created when they submit
             if not patient_row:
-                raise HTTPException(status_code=404, detail="Patient not found")
+                return {
+                    "status": "ok",
+                    "questionnaire_type": "weekly",
+                    "is_today_filled": False,
+                    "reason": "Welcome! Please start with your first weekly questionnaire (LARS)"
+                }
             
             patient_id = patient_row[0]
             patient_created_date = patient_row[1]
