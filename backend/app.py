@@ -90,20 +90,26 @@ if DATABASE_URL:
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
         # Configure engine for PgBouncer transaction mode
-        # Must disable prepared statements for PgBouncer compatibility
+        # Must disable prepared statements - use URL parameter approach
+        # Add statement_cache_size to URL since connect_args may not work
+        url_parts = urlsplit(ASYNC_DATABASE_URL)
+        query_params = dict(parse_qsl(url_parts.query, keep_blank_values=True))
+        query_params["statement_cache_size"] = "0"
+        new_query = urlencode(query_params)
+        final_url = urlunsplit((url_parts.scheme, url_parts.netloc, url_parts.path, new_query, url_parts.fragment))
+        
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
             },
-            "statement_cache_size": 0,  # CRITICAL: Disable prepared statements for PgBouncer
         }
         
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Create engine with PgBouncer-compatible settings
+        # Create engine - statement_cache_size in URL ensures it's passed to asyncpg
         engine: AsyncEngine = create_async_engine(
-            ASYNC_DATABASE_URL,
+            final_url,
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
