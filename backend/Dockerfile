@@ -11,14 +11,16 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . /app
 
-# Expose port
+# Expose port (Railway will set PORT env var)
 EXPOSE 8000
 
 # Env vars expected at runtime:
+# - PORT (set by Railway, defaults to 8000)
 # - DATABASE_URL (postgresql://...)
 # - SUPABASE_SSLMODE (optional: require/verify-full)
 # - SUPABASE_CA_PATH (optional)
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use PORT env var if set, otherwise default to 8000
+CMD sh -c "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"
 
 
