@@ -474,21 +474,19 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
                         INSERT INTO eq5d5l_entries (
                             patient_id, entry_date,
                             mobility, self_care, usual_activities,
-                            pain_discomfort, anxiety_depression, raw_data
+                            pain_discomfort, anxiety_depression
                         ) VALUES (
                             :patient_id,
                             COALESCE(CAST(:entry_date AS DATE), CURRENT_DATE),
                             :mobility, :self_care, :usual_activities,
-                            :pain_discomfort, :anxiety_depression,
-                            COALESCE(CAST(:raw_data AS JSONB), '{}'::jsonb)
+                            :pain_discomfort, :anxiety_depression
                         )
                         ON CONFLICT (patient_id, entry_date) DO UPDATE SET
                             mobility = EXCLUDED.mobility,
                             self_care = EXCLUDED.self_care,
                             usual_activities = EXCLUDED.usual_activities,
                             pain_discomfort = EXCLUDED.pain_discomfort,
-                            anxiety_depression = EXCLUDED.anxiety_depression,
-                            raw_data = EXCLUDED.raw_data
+                            anxiety_depression = EXCLUDED.anxiety_depression
                         RETURNING id
                     """)
                     .bindparams(
@@ -499,7 +497,6 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
                         usual_activities=payload.usual_activities,
                         pain_discomfort=payload.pain_discomfort,
                         anxiety_depression=payload.anxiety_depression,
-                        raw_data=json.dumps(payload.raw_data or {}),
                     )
                 )
                 row2 = res2.first()
