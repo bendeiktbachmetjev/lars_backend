@@ -84,37 +84,45 @@ async_session = None
 
 if DATABASE_URL:
     try:
-        # CRITICAL: Patch asyncpg dialect BEFORE creating engine
-        # This ensures statement_cache_size=0 is always used
-        import sqlalchemy.dialects.postgresql.asyncpg as asyncpg_dialect
-        
-        # Patch the connect method to always pass statement_cache_size=0
-        original_connect = asyncpg_dialect.AsyncPGDialect_asyncpg.connect
-        
-        async def connect_with_no_prepared(self, *cargs, **cparams):
-            # Force statement_cache_size=0 for all connections
-            cparams['statement_cache_size'] = 0
-            return await original_connect(self, *cargs, **cparams)
-        
-        asyncpg_dialect.AsyncPGDialect_asyncpg.connect = connect_with_no_prepared
-        
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         
         # Check if SSL is required
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
+        
+        # CRITICAL: Monkey-patch asyncpg.connect to always use statement_cache_size=0
+        # SQLAlchemy passes connect_args, but we need to ensure it's always 0
+        import asyncpg
+        
+        original_asyncpg_connect = asyncpg.connect
+        
+        async def patched_asyncpg_connect(*args, **kwargs):
+            # Force statement_cache_size=0 for PgBouncer compatibility
+            kwargs['statement_cache_size'] = 0
+            return await original_asyncpg_connect(*args, **kwargs)
+        
+        asyncpg.connect = patched_asyncpg_connect
+        
+        # Also patch create_pool to ensure consistency
+        original_create_pool = asyncpg.create_pool
+        
+        async def patched_create_pool(*args, **kwargs):
+            kwargs['statement_cache_size'] = 0
+            return await original_create_pool(*args, **kwargs)
+        
+        asyncpg.create_pool = patched_create_pool
         
         # Configure connect_args
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
             },
-            "statement_cache_size": 0,  # Also in connect_args as backup
+            "statement_cache_size": 0,  # Should be passed to asyncpg
         }
         
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Create engine - dialect is already patched to disable prepared statements
+        # Create engine - asyncpg.connect is already patched
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
