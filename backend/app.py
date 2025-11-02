@@ -89,27 +89,18 @@ if DATABASE_URL:
         # Check if SSL is required
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
-        # CRITICAL: For PgBouncer, use unique names for prepared statements
-        # This prevents "already exists" errors when connections are reused
-        import uuid
-        
-        def generate_unique_stmt_name():
-            """Generate unique prepared statement name to avoid PgBouncer conflicts"""
-            return f"__asyncpg_stmt_{uuid.uuid4().hex}__"
-        
-        # Configure connect_args with unique statement names
+        # Simple solution: disable prepared statements for PgBouncer
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
             },
-            "statement_cache_size": 0,  # Try to disable cache first
-            "prepared_statement_name_func": generate_unique_stmt_name,  # Unique names as backup
+            "statement_cache_size": 0,  # Disable prepared statements for PgBouncer
         }
         
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Create engine with unique statement names
+        # Create engine
         engine: AsyncEngine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
@@ -119,30 +110,6 @@ if DATABASE_URL:
             echo=False,
             connect_args=connect_args,
         )
-        
-        # CRITICAL: Also patch the adapter's name function to ensure uniqueness
-        # SQLAlchemy may not pass prepared_statement_name_func correctly
-        from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_dbapi
-        
-        # Patch the class method that generates statement names
-        original_name_func = getattr(AsyncAdapt_asyncpg_dbapi, '_prepared_statement_name_func', None)
-        
-        @staticmethod
-        def unique_name_func():
-            return generate_unique_stmt_name()
-        
-        # Set as static method
-        AsyncAdapt_asyncpg_dbapi._prepared_statement_name_func = unique_name_func
-        
-        # Also patch instance initialization to set per-instance name func
-        original_init = AsyncAdapt_asyncpg_dbapi.__init__
-        
-        def patched_init(self, asyncpg_connection, prepared_statement_cache=None):
-            original_init(self, asyncpg_connection, prepared_statement_cache)
-            # Override instance-level name function
-            self._prepared_statement_name_func = lambda: generate_unique_stmt_name()
-        
-        AsyncAdapt_asyncpg_dbapi.__init__ = patched_init
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
         print("Database engine initialized successfully")
     except Exception as e:
@@ -340,11 +307,21 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
+        
+        # Helpful error message for missing columns
+        if "does not exist" in error_msg.lower() or "column" in error_msg.lower():
+            error_msg = f"Database schema is outdated. Column missing: {error_msg}. Please run schema.sql migration in Supabase."
+        
         print(f"Error in sendDaily: {error_type}: {error_msg}")
         traceback.print_exc()
         return JSONResponse(
             status_code=500, 
-            content={"status": "error", "detail": error_msg, "error_type": error_type}
+            content={
+                "status": "error", 
+                "detail": error_msg, 
+                "error_type": error_type,
+                "hint": "Make sure schema.sql has been applied to your database"
+            }
         )
 
 
