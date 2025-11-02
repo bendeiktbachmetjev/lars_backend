@@ -413,6 +413,25 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
                 row2 = res2.first()
         return {"status": "ok", "id": str(row2[0])}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "detail": repr(e)})
+        # Log full error for debugging
+        error_msg = str(e)
+        error_type = type(e).__name__
+        
+        # Check if it's a table doesn't exist error
+        if "does not exist" in error_msg.lower() or "relation" in error_msg.lower() or "table" in error_msg.lower():
+            error_msg = f"Table 'eq5d5l_entries' does not exist. Please run the schema migration in Supabase SQL Editor."
+        
+        print(f"Error in sendEq5d5l: {error_type}: {error_msg}")
+        traceback.print_exc()
+        
+        return JSONResponse(
+            status_code=500, 
+            content={
+                "status": "error", 
+                "detail": error_msg,
+                "error_type": error_type,
+                "hint": "Check if eq5d5l_entries table exists in database"
+            }
+        )
 
 
