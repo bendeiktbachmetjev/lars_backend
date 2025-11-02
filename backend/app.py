@@ -95,6 +95,9 @@ if DATABASE_URL:
             "server_settings": {
                 "application_name": "lars_backend",
             },
+            # Disable prepared statement cache for PgBouncer transaction mode
+            # PgBouncer doesn't support prepared statements properly in transaction mode
+            "statement_cache_size": 0,
         }
         
         # Set SSL mode for asyncpg (asyncpg uses 'ssl' parameter, not 'sslmode')
