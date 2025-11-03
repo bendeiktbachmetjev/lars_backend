@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 class Eq5d5lQuestionnaireScreen extends StatefulWidget {
   const Eq5d5lQuestionnaireScreen({super.key});
@@ -14,6 +15,7 @@ class _Eq5d5lQuestionnaireScreenState extends State<Eq5d5lQuestionnaireScreen> {
   int usualActivities = 0;
   int painDiscomfort = 0;
   int anxietyDepression = 0;
+  int healthVas = 50; // default middle value for VAS (0..100)
 
   final TextStyle labelStyle = const TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
   final TextStyle optionStyle = const TextStyle(fontSize: 16, fontWeight: FontWeight.w500);
@@ -68,7 +70,7 @@ class _Eq5d5lQuestionnaireScreenState extends State<Eq5d5lQuestionnaireScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('EQ-5D-5L Questionnaire'),
+        title: Text(AppLocalizations.of(context)!.eq5d5lQuestionnaire),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -83,74 +85,139 @@ class _Eq5d5lQuestionnaireScreenState extends State<Eq5d5lQuestionnaireScreen> {
                 child: ListView(
                   children: [
                     const SizedBox(height: 12),
-                    Text('MOBILITY', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.mobility, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
                       options: [
-                        'I have no problems in walking about',
-                        'I have slight problems in walking about',
-                        'I have moderate problems in walking about',
-                        'I have severe problems in walking about',
-                        'I am unable to walk about',
+                        AppLocalizations.of(context)!.noProblemsWalking,
+                        AppLocalizations.of(context)!.slightProblemsWalking,
+                        AppLocalizations.of(context)!.moderateProblemsWalking,
+                        AppLocalizations.of(context)!.severeProblemsWalking,
+                        AppLocalizations.of(context)!.unableToWalk,
                       ],
                       value: mobility,
                       onChanged: (v) => setState(() => mobility = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('SELF-CARE', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.selfCare, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
                       options: [
-                        'I have no problems washing or dressing myself',
-                        'I have slight problems washing or dressing myself',
-                        'I have moderate problems washing or dressing myself',
-                        'I have severe problems washing or dressing myself',
-                        'I am unable to wash or dress myself',
+                        AppLocalizations.of(context)!.noProblemsWashing,
+                        AppLocalizations.of(context)!.slightProblemsWashing,
+                        AppLocalizations.of(context)!.moderateProblemsWashing,
+                        AppLocalizations.of(context)!.severeProblemsWashing,
+                        AppLocalizations.of(context)!.unableToWash,
                       ],
                       value: selfCare,
                       onChanged: (v) => setState(() => selfCare = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('USUAL ACTIVITIES\n(e.g. work, study, housework, family or leisure activities)', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.usualActivitiesDescription, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
                       options: [
-                        'I have no problems doing my usual activities',
-                        'I have slight problems doing my usual activities',
-                        'I have moderate problems doing my usual activities',
-                        'I have severe problems doing my usual activities',
-                        'I am unable to do my usual activities',
+                        AppLocalizations.of(context)!.noProblemsUsualActivities,
+                        AppLocalizations.of(context)!.slightProblemsUsualActivities,
+                        AppLocalizations.of(context)!.moderateProblemsUsualActivities,
+                        AppLocalizations.of(context)!.severeProblemsUsualActivities,
+                        AppLocalizations.of(context)!.unableToDoUsualActivities,
                       ],
                       value: usualActivities,
                       onChanged: (v) => setState(() => usualActivities = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('PAIN / DISCOMFORT', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.painDiscomfort, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
                       options: [
-                        'I have no pain or discomfort',
-                        'I have slight pain or discomfort',
-                        'I have moderate pain or discomfort',
-                        'I have severe pain or discomfort',
-                        'I have extreme pain or discomfort',
+                        AppLocalizations.of(context)!.noPainDiscomfort,
+                        AppLocalizations.of(context)!.slightPainDiscomfort,
+                        AppLocalizations.of(context)!.moderatePainDiscomfort,
+                        AppLocalizations.of(context)!.severePainDiscomfort,
+                        AppLocalizations.of(context)!.extremePainDiscomfort,
                       ],
                       value: painDiscomfort,
                       onChanged: (v) => setState(() => painDiscomfort = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('ANXIETY / DEPRESSION', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.anxietyDepression, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
                       options: [
-                        'I am not anxious or depressed',
-                        'I am slightly anxious or depressed',
-                        'I am moderately anxious or depressed',
-                        'I am severely anxious or depressed',
-                        'I am extremely anxious or depressed',
+                        AppLocalizations.of(context)!.notAnxiousDepressed,
+                        AppLocalizations.of(context)!.slightlyAnxiousDepressed,
+                        AppLocalizations.of(context)!.moderatelyAnxiousDepressed,
+                        AppLocalizations.of(context)!.severelyAnxiousDepressed,
+                        AppLocalizations.of(context)!.extremelyAnxiousDepressed,
                       ],
                       value: anxietyDepression,
                       onChanged: (v) => setState(() => anxietyDepression = v),
+                    ),
+                    const SizedBox(height: 24),
+                    // Health VAS
+                    Text(AppLocalizations.of(context)!.healthTodayTitle, style: labelStyle),
+                    const SizedBox(height: 8),
+                    Text(
+                      AppLocalizations.of(context)!.healthTodayDescription,
+                      style: const TextStyle(fontSize: 14, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          // Vertical slider using rotation
+                          Expanded(
+                            child: SizedBox(
+                              height: 220,
+                              child: RotatedBox(
+                                quarterTurns: -1,
+                                child: Slider(
+                                  value: healthVas.toDouble(),
+                                  min: 0,
+                                  max: 100,
+                                  divisions: 100,
+                                  label: healthVas.toString(),
+                                  onChanged: (v) => setState(() => healthVas = v.round()),
+                                  activeColor: Colors.black,
+                                  inactiveColor: Colors.grey[300],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                AppLocalizations.of(context)!.yourHealthTodayIs,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                width: 88,
+                                height: 44,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[400]!),
+                                ),
+                                child: Text(
+                                  healthVas.toString(),
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -184,7 +251,7 @@ class _Eq5d5lQuestionnaireScreenState extends State<Eq5d5lQuestionnaireScreen> {
                         if (code == null || code.isEmpty) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please set your patient code in Profile')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.pleaseSetPatientCode)),
                           );
                           return;
                         }
@@ -197,34 +264,36 @@ class _Eq5d5lQuestionnaireScreenState extends State<Eq5d5lQuestionnaireScreen> {
                             usualActivities: usualActivities,
                             painDiscomfort: painDiscomfort,
                             anxietyDepression: anxietyDepression,
+                            healthVas: healthVas,
                             rawData: {
                               'mobility': mobility,
                               'self_care': selfCare,
                               'usual_activities': usualActivities,
                               'pain_discomfort': painDiscomfort,
                               'anxiety_depression': anxietyDepression,
+                              'health_vas': healthVas,
                             },
                           );
                           if (resp.statusCode >= 200 && resp.statusCode < 300) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Submitted successfully')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submittedSuccessfully)),
                             );
                             Navigator.of(context).pop();
                           } else {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Submit failed: ${resp.statusCode}')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submitFailed(resp.statusCode))),
                             );
                           }
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.error(e.toString()))),
                           );
                         }
                       },
-                      child: const Text('Submit'),
+                      child: Text(AppLocalizations.of(context)!.submit),
                     ),
                   ),
                 ),

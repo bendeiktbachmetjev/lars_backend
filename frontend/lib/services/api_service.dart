@@ -102,6 +102,7 @@ class ApiService {
     required int usualActivities,
     required int painDiscomfort,
     required int anxietyDepression,
+    int? healthVas,
     String? entryDate,
     Map<String, dynamic>? rawData,
   }) async {
@@ -112,6 +113,7 @@ class ApiService {
       'usual_activities': usualActivities,
       'pain_discomfort': painDiscomfort,
       'anxiety_depression': anxietyDepression,
+      'health_vas': healthVas,
       'entry_date': entryDate,
       'raw_data': rawData,
     });

@@ -101,6 +101,8 @@ CREATE TABLE eq5d5l_entries (
   usual_activities SMALLINT NOT NULL CHECK (usual_activities BETWEEN 0 AND 4),
   pain_discomfort SMALLINT NOT NULL CHECK (pain_discomfort BETWEEN 0 AND 4),
   anxiety_depression SMALLINT NOT NULL CHECK (anxiety_depression BETWEEN 0 AND 4),
+  -- EQ-5D VAS today (0..100), optional
+  health_vas SMALLINT CHECK (health_vas BETWEEN 0 AND 100),
   
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (patient_id, entry_date)

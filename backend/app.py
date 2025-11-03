@@ -40,6 +40,7 @@ class Eq5d5lPayload(BaseModel):
     usual_activities: int
     pain_discomfort: int
     anxiety_depression: int
+    health_vas: Optional[int] = None  # 0..100 Visual Analogue Scale for health today
     entry_date: Optional[str] = None
     raw_data: Optional[dict] = None
 
@@ -469,24 +470,35 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
                 )
                 patient_id = res.first()[0]
 
+                # Extract health VAS from payload or raw_data if provided
+                health_vas = payload.health_vas
+                if health_vas is None and payload.raw_data is not None:
+                    hv = payload.raw_data.get("health_vas")
+                    if isinstance(hv, (int, float)):
+                        try:
+                            health_vas = int(hv)
+                        except Exception:
+                            health_vas = None
+
                 res2 = await session.execute(
                     text("""
                         INSERT INTO eq5d5l_entries (
                             patient_id, entry_date,
                             mobility, self_care, usual_activities,
-                            pain_discomfort, anxiety_depression
+                            pain_discomfort, anxiety_depression, health_vas
                         ) VALUES (
                             :patient_id,
                             COALESCE(CAST(:entry_date AS DATE), CURRENT_DATE),
                             :mobility, :self_care, :usual_activities,
-                            :pain_discomfort, :anxiety_depression
+                            :pain_discomfort, :anxiety_depression, :health_vas
                         )
                         ON CONFLICT (patient_id, entry_date) DO UPDATE SET
                             mobility = EXCLUDED.mobility,
                             self_care = EXCLUDED.self_care,
                             usual_activities = EXCLUDED.usual_activities,
                             pain_discomfort = EXCLUDED.pain_discomfort,
-                            anxiety_depression = EXCLUDED.anxiety_depression
+                            anxiety_depression = EXCLUDED.anxiety_depression,
+                            health_vas = EXCLUDED.health_vas
                         RETURNING id
                     """)
                     .bindparams(
@@ -497,6 +509,7 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
                         usual_activities=payload.usual_activities,
                         pain_discomfort=payload.pain_discomfort,
                         anxiety_depression=payload.anxiety_depression,
+                        health_vas=health_vas,
                     )
                 )
                 row2 = res2.first()
