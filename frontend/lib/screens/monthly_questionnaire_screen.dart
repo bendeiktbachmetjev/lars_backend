@@ -1,0 +1,215 @@
+import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
+
+class MonthlyQuestionnaireScreen extends StatefulWidget {
+  const MonthlyQuestionnaireScreen({super.key});
+
+  @override
+  State<MonthlyQuestionnaireScreen> createState() => _MonthlyQuestionnaireScreenState();
+}
+
+class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen> {
+  double avoidTravel = 1;
+  double avoidSocial = 1;
+  double embarrassed = 1;
+  double worryNotice = 1;
+  double depressed = 1;
+  double control = 0;
+  double satisfaction = 0;
+
+  final TextStyle labelStyle = const TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
+  final Color activeColor = Colors.black;
+
+  Widget _buildLikertSlider({
+    required String label,
+    required double value,
+    required int min,
+    required int max,
+    required void Function(double) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: labelStyle),
+        Row(
+          children: [
+            Text('$min', style: const TextStyle(fontSize: 14)),
+            Expanded(
+              child: Slider(
+                value: value,
+                min: min.toDouble(),
+                max: max.toDouble(),
+                divisions: max - min,
+                label: value.round().toString(),
+                onChanged: onChanged,
+                activeColor: activeColor,
+                thumbColor: activeColor,
+              ),
+            ),
+            Text('$max', style: const TextStyle(fontSize: 14)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context)!.monthlyQualityOfLife),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  children: [
+                    const SizedBox(height: 12),
+                    _buildLikertSlider(
+                      label: AppLocalizations.of(context)!.avoidTraveling,
+                      value: avoidTravel,
+                      min: 1,
+                      max: 4,
+                      onChanged: (v) => setState(() => avoidTravel = v),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildLikertSlider(
+                      label: AppLocalizations.of(context)!.avoidSocialActivities,
+                      value: avoidSocial,
+                      min: 1,
+                      max: 4,
+                      onChanged: (v) => setState(() => avoidSocial = v),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildLikertSlider(
+                      label: AppLocalizations.of(context)!.feelEmbarrassed,
+                      value: embarrassed,
+                      min: 1,
+                      max: 4,
+                      onChanged: (v) => setState(() => embarrassed = v),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildLikertSlider(
+                      label: AppLocalizations.of(context)!.worryOthersNotice,
+                      value: worryNotice,
+                      min: 1,
+                      max: 4,
+                      onChanged: (v) => setState(() => worryNotice = v),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildLikertSlider(
+                      label: AppLocalizations.of(context)!.feelDepressed,
+                      value: depressed,
+                      min: 1,
+                      max: 4,
+                      onChanged: (v) => setState(() => depressed = v),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildLikertSlider(
+                      label: AppLocalizations.of(context)!.feelInControl,
+                      value: control,
+                      min: 0,
+                      max: 10,
+                      onChanged: (v) => setState(() => control = v),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildLikertSlider(
+                      label: AppLocalizations.of(context)!.overallSatisfaction,
+                      value: satisfaction,
+                      min: 0,
+                      max: 10,
+                      onChanged: (v) => setState(() => satisfaction = v),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 24.0, bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF3A8DFF), Color(0xFF8F5CFF)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        final api = ApiService();
+                        final code = await api.getPatientCode();
+                        if (code == null || code.isEmpty) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(AppLocalizations.of(context)!.pleaseSetPatientCode)),
+                          );
+                          return;
+                        }
+
+                        final overall = ((control + satisfaction) / 2).round();
+                        final raw = {
+                          'avoid_travel': avoidTravel,
+                          'avoid_social': avoidSocial,
+                          'embarrassed': embarrassed,
+                          'worry_notice': worryNotice,
+                          'depressed': depressed,
+                          'control': control,
+                          'satisfaction': satisfaction,
+                        };
+
+                        try {
+                          final resp = await api.sendMonthly(
+                            patientCode: code,
+                            qolScore: overall,
+                            rawData: raw,
+                          );
+                          if (resp.statusCode >= 200 && resp.statusCode < 300) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submittedSuccessfully)),
+                            );
+                            Navigator.of(context).pop();
+                          } else {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submitFailed(resp.statusCode))),
+                            );
+                          }
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(AppLocalizations.of(context)!.error(e.toString()))),
+                          );
+                        }
+                      },
+                      child: Text(AppLocalizations.of(context)!.submit),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+} 

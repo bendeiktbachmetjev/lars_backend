@@ -1,0 +1,667 @@
+{
+  "@@locale": "en",
+  "appTitle": "iLARS",
+  "@appTitle": {
+    "description": "The application title"
+  },
+  "appName": "iLARS",
+  "@appName": {
+    "description": "Application name for app store"
+  },
+  "dashboard": "Dashboard",
+  "@dashboard": {
+    "description": "Dashboard tab label"
+  },
+  "profile": "Profile",
+  "@profile": {
+    "description": "Profile tab label"
+  },
+  "statistics": "Statistics",
+  "@statistics": {
+    "description": "Statistics section title"
+  },
+  "weekly": "Weekly",
+  "@weekly": {
+    "description": "Weekly time period label"
+  },
+  "monthly": "Monthly",
+  "@monthly": {
+    "description": "Monthly time period label"
+  },
+  "yearly": "Yearly",
+  "@yearly": {
+    "description": "Yearly time period label"
+  },
+  "todaysQuestionnaire": "Today's Questionnaire",
+  "@todaysQuestionnaire": {
+    "description": "Today's questionnaire section title"
+  },
+  "dailyQuestionnaire": "Daily Questionnaire",
+  "@dailyQuestionnaire": {
+    "description": "Daily questionnaire name"
+  },
+  "weeklyQuestionnaire": "Weekly Questionnaire (LARS)",
+  "@weeklyQuestionnaire": {
+    "description": "Weekly questionnaire name"
+  },
+  "monthlyQuestionnaire": "Monthly Questionnaire",
+  "@monthlyQuestionnaire": {
+    "description": "Monthly questionnaire name"
+  },
+  "qualityOfLifeQuestionnaire": "Quality of Life Questionnaire (EQ-5D-5L)",
+  "@qualityOfLifeQuestionnaire": {
+    "description": "Quality of life questionnaire name"
+  },
+  "noQuestionnaireNeeded": "No questionnaire needed",
+  "@noQuestionnaireNeeded": {
+    "description": "Message when no questionnaire is needed"
+  },
+  "allQuestionnairesUpToDate": "All questionnaires are up to date",
+  "@allQuestionnairesUpToDate": {
+    "description": "Message when all questionnaires are completed"
+  },
+  "fillItNow": "Fill It Now",
+  "@fillItNow": {
+    "description": "Button to fill questionnaire"
+  },
+  "pleaseSetPatientCode": "Please set your patient code in Profile",
+  "@pleaseSetPatientCode": {
+    "description": "Message when patient code is not set"
+  },
+  "failedToLoadQuestionnaireInfo": "Failed to load questionnaire info",
+  "@failedToLoadQuestionnaireInfo": {
+    "description": "Error message when questionnaire info fails to load"
+  },
+  "retry": "Retry",
+  "@retry": {
+    "description": "Retry button label"
+  },
+  "completeWeeklyQuestionnairesToSeeStatistics": "Complete weekly questionnaires to see your LARS score statistics",
+  "@completeWeeklyQuestionnairesToSeeStatistics": {
+    "description": "Message prompting to complete weekly questionnaires"
+  },
+  "completeMoreWeeklyQuestionnaires": "Complete more weekly questionnaires to see improvement trends",
+  "@completeMoreWeeklyQuestionnaires": {
+    "description": "Message when need more data for trends"
+  },
+  "ilarsPatient": "iLARS Patient",
+  "@ilarsPatient": {
+    "description": "Patient profile title"
+  },
+  "noPatientCode": "No patient code",
+  "@noPatientCode": {
+    "description": "Message when no patient code is set"
+  },
+  "code": "Code: {code}",
+  "@code": {
+    "description": "Patient code display",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "patientCode": "Patient Code",
+  "@patientCode": {
+    "description": "Patient code field label"
+  },
+  "enterYourCode": "Enter your code",
+  "@enterYourCode": {
+    "description": "Placeholder for patient code input"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save button label"
+  },
+  "logout": "Logout",
+  "@logout": {
+    "description": "Logout button label"
+  },
+  "patientCodeSaved": "Patient code saved",
+  "@patientCodeSaved": {
+    "description": "Success message when patient code is saved"
+  },
+  "patientCodeCleared": "Patient code cleared",
+  "@patientCodeCleared": {
+    "description": "Message when patient code is cleared"
+  },
+  "dailySymptoms": "Daily Symptoms",
+  "@dailySymptoms": {
+    "description": "Daily questionnaire screen title"
+  },
+  "stoolPerDay": "Stool/day",
+  "@stoolPerDay": {
+    "description": "Stool count per day label"
+  },
+  "padsUsed": "Pads used",
+  "@padsUsed": {
+    "description": "Pads used label"
+  },
+  "urgent": "Urgent",
+  "@urgent": {
+    "description": "Urgent label"
+  },
+  "nightStools": "Night stools",
+  "@nightStools": {
+    "description": "Night stools label"
+  },
+  "yes": "Yes",
+  "@yes": {
+    "description": "Yes option"
+  },
+  "no": "No",
+  "@no": {
+    "description": "No option"
+  },
+  "stoolLeakage": "Stool leakage",
+  "@stoolLeakage": {
+    "description": "Stool leakage label"
+  },
+  "none": "None",
+  "@none": {
+    "description": "None option"
+  },
+  "liquid": "Liquid",
+  "@liquid": {
+    "description": "Liquid option"
+  },
+  "solid": "Solid",
+  "@solid": {
+    "description": "Solid option"
+  },
+  "incompleteEvacuation": "Incomplete evacuation",
+  "@incompleteEvacuation": {
+    "description": "Incomplete evacuation label"
+  },
+  "bloating": "Bloating",
+  "@bloating": {
+    "description": "Bloating label"
+  },
+  "impactOnLife": "Impact on life",
+  "@impactOnLife": {
+    "description": "Impact on life label"
+  },
+  "whatDidYouConsumeToday": "What did you consume today?",
+  "@whatDidYouConsumeToday": {
+    "description": "Food consumption question"
+  },
+  "whatDidYouDrinkToday": "What did you drink today?",
+  "@whatDidYouDrinkToday": {
+    "description": "Drink consumption question"
+  },
+  "quantity": "Quantity ({unit}):",
+  "@quantity": {
+    "description": "Quantity label with unit",
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "stoolConsistency": "Stool Consistency",
+  "@stoolConsistency": {
+    "description": "Bristol scale selector title"
+  },
+  "submit": "Submit",
+  "@submit": {
+    "description": "Submit button label"
+  },
+  "submittedSuccessfully": "Submitted successfully",
+  "@submittedSuccessfully": {
+    "description": "Success message after submission"
+  },
+  "submitFailed": "Submit failed: {statusCode}",
+  "@submitFailed": {
+    "description": "Error message when submission fails",
+    "placeholders": {
+      "statusCode": {
+        "type": "int"
+      }
+    }
+  },
+  "error": "Error: {error}",
+  "@error": {
+    "description": "Generic error message",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "larsScoreQuestionnaire": "LARS Score Questionnaire",
+  "@larsScoreQuestionnaire": {
+    "description": "Weekly questionnaire screen title"
+  },
+  "flatusControlQuestion": "Do you ever have occasions when you cannot control your flatus (wind)?",
+  "@flatusControlQuestion": {
+    "description": "Flatus control question"
+  },
+  "liquidStoolLeakageQuestion": "Do you ever have any accidental leakage of liquid stool?",
+  "@liquidStoolLeakageQuestion": {
+    "description": "Liquid stool leakage question"
+  },
+  "bowelFrequencyQuestion": "How often do you open your bowels?",
+  "@bowelFrequencyQuestion": {
+    "description": "Bowel frequency question"
+  },
+  "repeatBowelOpeningQuestion": "Do you ever have to open your bowels again within one hour of the last bowel opening?",
+  "@repeatBowelOpeningQuestion": {
+    "description": "Repeat bowel opening question"
+  },
+  "urgencyToToiletQuestion": "Do you ever have such a strong urge to open your bowels that you have to rush to the toilet?",
+  "@urgencyToToiletQuestion": {
+    "description": "Urgency to toilet question"
+  },
+  "totalScore": "Total Score:",
+  "@totalScore": {
+    "description": "Total score label"
+  },
+  "noNever": "No, never",
+  "@noNever": {
+    "description": "No never option"
+  },
+  "yesLessThanOncePerWeek": "Yes, less than once per week",
+  "@yesLessThanOncePerWeek": {
+    "description": "Yes less than once per week option"
+  },
+  "yesAtLeastOncePerWeek": "Yes, at least once per week",
+  "@yesAtLeastOncePerWeek": {
+    "description": "Yes at least once per week option"
+  },
+  "moreThan7TimesPerDay": "More than 7 times per day (24 hours)",
+  "@moreThan7TimesPerDay": {
+    "description": "More than 7 times per day option"
+  },
+  "timesPerDay": "{min}-{max} times per day (24 hours)",
+  "@timesPerDay": {
+    "description": "Times per day option with range",
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "lessThanOncePerDay": "Less than once per day (24 hours)",
+  "@lessThanOncePerDay": {
+    "description": "Less than once per day option"
+  },
+  "monthlyQualityOfLife": "Monthly Quality of Life ",
+  "@monthlyQualityOfLife": {
+    "description": "Monthly questionnaire screen title"
+  },
+  "avoidTraveling": "I avoid traveling due to bowel problems",
+  "@avoidTraveling": {
+    "description": "Avoid traveling question"
+  },
+  "avoidSocialActivities": "I avoid social activities",
+  "@avoidSocialActivities": {
+    "description": "Avoid social activities question"
+  },
+  "feelEmbarrassed": "I feel embarrassed by my condition",
+  "@feelEmbarrassed": {
+    "description": "Feel embarrassed question"
+  },
+  "worryOthersNotice": "I worry others will notice my symptoms",
+  "@worryOthersNotice": {
+    "description": "Worry others notice question"
+  },
+  "feelDepressed": "I feel depressed because of bowel function",
+  "@feelDepressed": {
+    "description": "Feel depressed question"
+  },
+  "feelInControl": "I feel in control of my bowel symptoms",
+  "@feelInControl": {
+    "description": "Feel in control question"
+  },
+  "overallSatisfaction": "Overall satisfaction with bowel function",
+  "@overallSatisfaction": {
+    "description": "Overall satisfaction question"
+  },
+  "eq5d5lQuestionnaire": "EQ-5D-5L Questionnaire",
+  "@eq5d5lQuestionnaire": {
+    "description": "EQ-5D-5L questionnaire screen title"
+  },
+  "mobility": "MOBILITY",
+  "@mobility": {
+    "description": "Mobility category"
+  },
+  "selfCare": "SELF-CARE",
+  "@selfCare": {
+    "description": "Self-care category"
+  },
+  "usualActivities": "USUAL ACTIVITIES",
+  "@usualActivities": {
+    "description": "Usual activities category"
+  },
+  "usualActivitiesDescription": "USUAL ACTIVITIES\n(e.g. work, study, housework, family or leisure activities)",
+  "@usualActivitiesDescription": {
+    "description": "Usual activities with description"
+  },
+  "painDiscomfort": "PAIN / DISCOMFORT",
+  "@painDiscomfort": {
+    "description": "Pain/discomfort category"
+  },
+  "anxietyDepression": "ANXIETY / DEPRESSION",
+  "@anxietyDepression": {
+    "description": "Anxiety/depression category"
+  },
+  "noProblemsWalking": "I have no problems in walking about",
+  "@noProblemsWalking": {
+    "description": "No problems walking option"
+  },
+  "slightProblemsWalking": "I have slight problems in walking about",
+  "@slightProblemsWalking": {
+    "description": "Slight problems walking option"
+  },
+  "moderateProblemsWalking": "I have moderate problems in walking about",
+  "@moderateProblemsWalking": {
+    "description": "Moderate problems walking option"
+  },
+  "severeProblemsWalking": "I have severe problems in walking about",
+  "@severeProblemsWalking": {
+    "description": "Severe problems walking option"
+  },
+  "unableToWalk": "I am unable to walk about",
+  "@unableToWalk": {
+    "description": "Unable to walk option"
+  },
+  "noProblemsWashing": "I have no problems washing or dressing myself",
+  "@noProblemsWashing": {
+    "description": "No problems washing option"
+  },
+  "slightProblemsWashing": "I have slight problems washing or dressing myself",
+  "@slightProblemsWashing": {
+    "description": "Slight problems washing option"
+  },
+  "moderateProblemsWashing": "I have moderate problems washing or dressing myself",
+  "@moderateProblemsWashing": {
+    "description": "Moderate problems washing option"
+  },
+  "severeProblemsWashing": "I have severe problems washing or dressing myself",
+  "@severeProblemsWashing": {
+    "description": "Severe problems washing option"
+  },
+  "unableToWash": "I am unable to wash or dress myself",
+  "@unableToWash": {
+    "description": "Unable to wash option"
+  },
+  "noProblemsUsualActivities": "I have no problems doing my usual activities",
+  "@noProblemsUsualActivities": {
+    "description": "No problems usual activities option"
+  },
+  "slightProblemsUsualActivities": "I have slight problems doing my usual activities",
+  "@slightProblemsUsualActivities": {
+    "description": "Slight problems usual activities option"
+  },
+  "moderateProblemsUsualActivities": "I have moderate problems doing my usual activities",
+  "@moderateProblemsUsualActivities": {
+    "description": "Moderate problems usual activities option"
+  },
+  "severeProblemsUsualActivities": "I have severe problems doing my usual activities",
+  "@severeProblemsUsualActivities": {
+    "description": "Severe problems usual activities option"
+  },
+  "unableToDoUsualActivities": "I am unable to do my usual activities",
+  "@unableToDoUsualActivities": {
+    "description": "Unable to do usual activities option"
+  },
+  "noPainDiscomfort": "I have no pain or discomfort",
+  "@noPainDiscomfort": {
+    "description": "No pain or discomfort option"
+  },
+  "slightPainDiscomfort": "I have slight pain or discomfort",
+  "@slightPainDiscomfort": {
+    "description": "Slight pain or discomfort option"
+  },
+  "moderatePainDiscomfort": "I have moderate pain or discomfort",
+  "@moderatePainDiscomfort": {
+    "description": "Moderate pain or discomfort option"
+  },
+  "severePainDiscomfort": "I have severe pain or discomfort",
+  "@severePainDiscomfort": {
+    "description": "Severe pain or discomfort option"
+  },
+  "extremePainDiscomfort": "I have extreme pain or discomfort",
+  "@extremePainDiscomfort": {
+    "description": "Extreme pain or discomfort option"
+  },
+  "notAnxiousDepressed": "I am not anxious or depressed",
+  "@notAnxiousDepressed": {
+    "description": "Not anxious or depressed option"
+  },
+  "slightlyAnxiousDepressed": "I am slightly anxious or depressed",
+  "@slightlyAnxiousDepressed": {
+    "description": "Slightly anxious or depressed option"
+  },
+  "moderatelyAnxiousDepressed": "I am moderately anxious or depressed",
+  "@moderatelyAnxiousDepressed": {
+    "description": "Moderately anxious or depressed option"
+  },
+  "severelyAnxiousDepressed": "I am severely anxious or depressed",
+  "@severelyAnxiousDepressed": {
+    "description": "Severely anxious or depressed option"
+  },
+  "extremelyAnxiousDepressed": "I am extremely anxious or depressed",
+  "@extremelyAnxiousDepressed": {
+    "description": "Extremely anxious or depressed option"
+  },
+  "noPatientCodeSet": "No patient code set",
+  "@noPatientCodeSet": {
+    "description": "Message when patient code is not set in chart widget"
+  },
+  "failedToFetchLarsData": "Failed to fetch LARS data: {error}",
+  "@failedToFetchLarsData": {
+    "description": "Error message when LARS data fetch fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noDataAvailableYet": "No data available yet",
+  "@noDataAvailableYet": {
+    "description": "Message when no chart data is available"
+  },
+  "foodVegetablesAllTypes": "Vegetables (all types)",
+  "@foodVegetablesAllTypes": {
+    "description": "Vegetables food item name"
+  },
+  "foodVegetablesExamples": "Cabbage, broccoli, carrots, beets, cauliflower, zucchini, spinach",
+  "@foodVegetablesExamples": {
+    "description": "Vegetables examples"
+  },
+  "foodRootVegetables": "Root vegetables",
+  "@foodRootVegetables": {
+    "description": "Root vegetables food item name"
+  },
+  "foodRootVegetablesExamples": "Potatoes with skin, carrots, parsnips, celery root",
+  "@foodRootVegetablesExamples": {
+    "description": "Root vegetables examples"
+  },
+  "foodWholeGrains": "Whole grains",
+  "@foodWholeGrains": {
+    "description": "Whole grains food item name"
+  },
+  "foodWholeGrainsExamples": "Oatmeal, buckwheat, pearl barley, brown rice, quinoa",
+  "@foodWholeGrainsExamples": {
+    "description": "Whole grains examples"
+  },
+  "foodWholeGrainBread": "Whole grain bread",
+  "@foodWholeGrainBread": {
+    "description": "Whole grain bread food item name"
+  },
+  "foodWholeGrainBreadExamples": "Black bread, bran bread, whole grain bread",
+  "@foodWholeGrainBreadExamples": {
+    "description": "Whole grain bread examples"
+  },
+  "foodNutsAndSeeds": "Nuts and seeds",
+  "@foodNutsAndSeeds": {
+    "description": "Nuts and seeds food item name"
+  },
+  "foodNutsAndSeedsExamples": "Almonds, walnuts, hazelnuts, seeds, flax seeds, chia",
+  "@foodNutsAndSeedsExamples": {
+    "description": "Nuts and seeds examples"
+  },
+  "foodLegumes": "Legumes",
+  "@foodLegumes": {
+    "description": "Legumes food item name"
+  },
+  "foodLegumesExamples": "Beans (any), lentils, chickpeas, peas (including soups)",
+  "@foodLegumesExamples": {
+    "description": "Legumes examples"
+  },
+  "foodFruitsWithSkin": "Fruits with skin",
+  "@foodFruitsWithSkin": {
+    "description": "Fruits with skin food item name"
+  },
+  "foodFruitsWithSkinExamples": "Apples, pears, plums, apricots (if skin eaten)",
+  "@foodFruitsWithSkinExamples": {
+    "description": "Fruits with skin examples"
+  },
+  "foodBerriesAny": "Berries (any)",
+  "@foodBerriesAny": {
+    "description": "Berries food item name"
+  },
+  "foodBerriesExamples": "Raspberries, strawberries, blueberries, currants, blackberries",
+  "@foodBerriesExamples": {
+    "description": "Berries examples"
+  },
+  "foodSoftFruitsWithoutSkin": "Soft fruits without skin",
+  "@foodSoftFruitsWithoutSkin": {
+    "description": "Soft fruits without skin food item name"
+  },
+  "foodSoftFruitsExamples": "Bananas, melon, watermelon, mango",
+  "@foodSoftFruitsExamples": {
+    "description": "Soft fruits examples"
+  },
+  "foodMuesliAndBranCereals": "Muesli and bran cereals",
+  "@foodMuesliAndBranCereals": {
+    "description": "Muesli and bran cereals food item name"
+  },
+  "foodMuesliExamples": "Sugar-free muesli, bran cereals, granola",
+  "@foodMuesliExamples": {
+    "description": "Muesli examples"
+  },
+  "drinkWater": "Water",
+  "@drinkWater": {
+    "description": "Water drink item name"
+  },
+  "drinkWaterExamples": "Plain water, mineral water, filtered water",
+  "@drinkWaterExamples": {
+    "description": "Water examples"
+  },
+  "drinkCoffee": "Coffee",
+  "@drinkCoffee": {
+    "description": "Coffee drink item name"
+  },
+  "drinkCoffeeExamples": "Espresso, cappuccino, americano, latte",
+  "@drinkCoffeeExamples": {
+    "description": "Coffee examples"
+  },
+  "drinkTea": "Tea",
+  "@drinkTea": {
+    "description": "Tea drink item name"
+  },
+  "drinkTeaExamples": "Black tea, green tea, herbal tea, chamomile",
+  "@drinkTeaExamples": {
+    "description": "Tea examples"
+  },
+  "drinkAlcohol": "Alcohol",
+  "@drinkAlcohol": {
+    "description": "Alcohol drink item name"
+  },
+  "drinkAlcoholExamples": "Beer, wine, spirits, cocktails",
+  "@drinkAlcoholExamples": {
+    "description": "Alcohol examples"
+  },
+  "drinkCarbonatedDrinks": "Carbonated drinks",
+  "@drinkCarbonatedDrinks": {
+    "description": "Carbonated drinks item name"
+  },
+  "drinkCarbonatedExamples": "Cola, sprite, fanta, sparkling water",
+  "@drinkCarbonatedExamples": {
+    "description": "Carbonated drinks examples"
+  },
+  "drinkJuices": "Juices",
+  "@drinkJuices": {
+    "description": "Juices drink item name"
+  },
+  "drinkJuicesExamples": "Orange juice, apple juice, grape juice, smoothies",
+  "@drinkJuicesExamples": {
+    "description": "Juices examples"
+  },
+  "drinkDairyDrinks": "Dairy drinks",
+  "@drinkDairyDrinks": {
+    "description": "Dairy drinks item name"
+  },
+  "drinkDairyExamples": "Milk, kefir, yogurt drinks, milkshakes",
+  "@drinkDairyExamples": {
+    "description": "Dairy drinks examples"
+  },
+  "drinkEnergyDrinks": "Energy drinks",
+  "@drinkEnergyDrinks": {
+    "description": "Energy drinks item name"
+  },
+  "drinkEnergyExamples": "Red Bull, Monster, energy shots",
+  "@drinkEnergyExamples": {
+    "description": "Energy drinks examples"
+  },
+  "unitServings": "servings",
+  "@unitServings": {
+    "description": "Servings unit"
+  },
+  "unitSlices": "slices",
+  "@unitSlices": {
+    "description": "Slices unit"
+  },
+  "unitHandfuls": "handfuls",
+  "@unitHandfuls": {
+    "description": "Handfuls unit"
+  },
+  "unitPieces": "pieces",
+  "@unitPieces": {
+    "description": "Pieces unit"
+  },
+  "unitGlasses": "glasses",
+  "@unitGlasses": {
+    "description": "Glasses unit"
+  },
+  "unitCups": "cups",
+  "@unitCups": {
+    "description": "Cups unit"
+  },
+  "unitDrinks": "drinks",
+  "@unitDrinks": {
+    "description": "Drinks unit"
+  },
+  "unitCans": "cans",
+  "@unitCans": {
+    "description": "Cans unit"
+  },
+  "notificationTitle": "Time to fill questionnaire",
+  "@notificationTitle": {
+    "description": "Daily notification title"
+  },
+  "notificationBody": "Don't forget to fill out today's questionnaire",
+  "@notificationBody": {
+    "description": "Daily notification body text"
+  },
+  "healthTodayTitle": "YOUR HEALTH TODAY",
+  "@healthTodayTitle": {"description": "VAS title"},
+  "healthTodayDescription": "We would like to know how good or bad your health is TODAY. This scale is numbered from 0 to 100. 100 means the best health you can imagine. 0 means the worst health you can imagine.",
+  "@healthTodayDescription": {"description": "VAS description"},
+  "yourHealthTodayIs": "YOUR HEALTH TODAY =",
+  "@yourHealthTodayIs": {"description": "Label before numeric value"},
+  "termsOfUse": "Terms of Use",
+  "@termsOfUse": {"description": "Legal: Terms of Use title"},
+  "privacyPolicy": "Privacy Policy",
+  "@privacyPolicy": {"description": "Legal: Privacy Policy title"},
+  "termsOfUseComingSoon": "Coming soon: Terms of Use content will appear here.",
+  "@termsOfUseComingSoon": {"description": "Placeholder text for Terms of Use"},
+  "privacyPolicyComingSoon": "Coming soon: Privacy Policy content will appear here.",
+  "@privacyPolicyComingSoon": {"description": "Placeholder text for Privacy Policy"}
+}
+
