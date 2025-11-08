@@ -39,7 +39,7 @@ CREATE TABLE daily_entries (
   pads_used SMALLINT NOT NULL DEFAULT 0,
   urgency TEXT NOT NULL DEFAULT 'No' CHECK (urgency IN ('Yes', 'No')),
   night_stools TEXT NOT NULL DEFAULT 'No' CHECK (night_stools IN ('Yes', 'No')),
-  leakage TEXT NOT NULL DEFAULT 'None' CHECK (leakage IN ('None', 'Liquid', 'Solid')),
+  leakage TEXT NOT NULL DEFAULT 'None' CHECK (leakage IN ('None', 'Small', 'Large')),
   incomplete_evacuation TEXT NOT NULL DEFAULT 'No' CHECK (incomplete_evacuation IN ('Yes', 'No')),
   bloating NUMERIC(5, 2) NOT NULL DEFAULT 0,
   impact_score NUMERIC(5, 2) NOT NULL DEFAULT 0,
