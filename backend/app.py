@@ -231,34 +231,40 @@ async def send_daily(payload: DailyPayload, x_patient_code: Optional[str] = Head
                 urgency = raw.get("urgency", "No")
                 night_stools = raw.get("night_stools", "No")
                 leakage = raw.get("leakage", "None")
+                # Validate leakage value matches frontend options
+                if leakage not in ("None", "Liquid", "Solid"):
+                    print(f"Warning: Invalid leakage value '{leakage}', defaulting to 'None'")
+                    leakage = "None"
                 incomplete_evacuation = raw.get("incomplete_evacuation", "No")
                 bloating = raw.get("bloating", 0.0)
                 impact_score = raw.get("impact_score", 0.0)
                 activity_interfere = raw.get("activity_interfere", 0.0)
                 
                 # Парсим food_consumption Map в отдельные колонки
+                # Frontend sends keys: 'vegetables_all_types', 'root_vegetables', etc.
                 food = payload.food_consumption or {}
-                food_vegetables_all = food.get("Vegetables (all types)", 0)
-                food_root_vegetables = food.get("Root vegetables", 0)
-                food_whole_grains = food.get("Whole grains", 0)
-                food_whole_grain_bread = food.get("Whole grain bread", 0)
-                food_nuts_and_seeds = food.get("Nuts and seeds", 0)
-                food_legumes = food.get("Legumes", 0)
-                food_fruits_with_skin = food.get("Fruits with skin", 0)
-                food_berries = food.get("Berries (any)", 0)
-                food_soft_fruits_no_skin = food.get("Soft fruits without skin", 0)
-                food_muesli_and_bran = food.get("Muesli and bran cereals", 0)
+                food_vegetables_all = food.get("vegetables_all_types", 0)
+                food_root_vegetables = food.get("root_vegetables", 0)
+                food_whole_grains = food.get("whole_grains", 0)
+                food_whole_grain_bread = food.get("whole_grain_bread", 0)
+                food_nuts_and_seeds = food.get("nuts_and_seeds", 0)
+                food_legumes = food.get("legumes", 0)
+                food_fruits_with_skin = food.get("fruits_with_skin", 0)
+                food_berries = food.get("berries_any", 0)
+                food_soft_fruits_no_skin = food.get("soft_fruits_without_skin", 0)
+                food_muesli_and_bran = food.get("muesli_and_bran_cereals", 0)
                 
                 # Парсим drink_consumption Map в отдельные колонки
+                # Frontend sends keys: 'water', 'coffee', 'tea', etc.
                 drink = payload.drink_consumption or {}
-                drink_water = drink.get("Water", 0)
-                drink_coffee = drink.get("Coffee", 0)
-                drink_tea = drink.get("Tea", 0)
-                drink_alcohol = drink.get("Alcohol", 0)
-                drink_carbonated = drink.get("Carbonated drinks", 0)
-                drink_juices = drink.get("Juices", 0)
-                drink_dairy = drink.get("Dairy drinks", 0)
-                drink_energy = drink.get("Energy drinks", 0)
+                drink_water = drink.get("water", 0)
+                drink_coffee = drink.get("coffee", 0)
+                drink_tea = drink.get("tea", 0)
+                drink_alcohol = drink.get("alcohol", 0)
+                drink_carbonated = drink.get("carbonated_drinks", 0)
+                drink_juices = drink.get("juices", 0)
+                drink_dairy = drink.get("dairy_drinks", 0)
+                drink_energy = drink.get("energy_drinks", 0)
                 
                 res2 = await session.execute(
                     text("""
