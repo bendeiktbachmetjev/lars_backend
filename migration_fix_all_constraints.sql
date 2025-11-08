@@ -19,3 +19,4 @@ ALTER TABLE daily_entries
 UPDATE daily_entries SET leakage = 'Liquid' WHERE leakage = 'Small';
 UPDATE daily_entries SET leakage = 'Solid' WHERE leakage = 'Large';
 
+

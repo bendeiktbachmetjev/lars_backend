@@ -104,9 +104,11 @@ if DATABASE_URL:
         engine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=10,
+            pool_size=10,
+            max_overflow=20,
             pool_recycle=300,
+            pool_timeout=30,
+            max_identifier_length=128,
             echo=False,
             connect_args=connect_args,
         )
@@ -671,12 +673,20 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
         from datetime import datetime, date, timedelta
         
         async with async_session() as session:
-            # Get patient_id and created_at
+            today = date.today()
+            
+            # Optimized: Get all patient data and last completion dates in ONE query
             patient_res = await session.execute(
                 text("""
-                    SELECT id, created_at::DATE as patient_created_date
-                    FROM patients 
-                    WHERE patient_code = :code
+                    SELECT 
+                        p.id,
+                        p.created_at::DATE as patient_created_date,
+                        (SELECT MAX(entry_date) FROM weekly_entries WHERE patient_id = p.id) as last_weekly_date,
+                        (SELECT MAX(entry_date) FROM monthly_entries WHERE patient_id = p.id) as last_monthly_date,
+                        (SELECT MAX(entry_date) FROM eq5d5l_entries WHERE patient_id = p.id) as last_eq5d5l_date,
+                        (SELECT MAX(entry_date) FROM daily_entries WHERE patient_id = p.id) as last_daily_date
+                    FROM patients p
+                    WHERE p.patient_code = :code
                 """).bindparams(code=patient_code)
             )
             patient_row = patient_res.first()
@@ -692,94 +702,69 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
             
             patient_id = patient_row[0]
             patient_created_date = patient_row[1] if patient_row[1] is not None else None
-            today = date.today()
-            
-            # Get last completion dates for each questionnaire type
-            # Handle NULL values properly - MAX returns NULL if no rows exist
-            last_weekly = await session.execute(
-                text("""
-                    SELECT MAX(entry_date) as last_date
-                    FROM weekly_entries
-                    WHERE patient_id = :patient_id
-                """).bindparams(patient_id=patient_id)
-            )
-            last_weekly_row = last_weekly.first()
-            last_weekly_date = last_weekly_row[0] if last_weekly_row and last_weekly_row[0] is not None else None
-            
-            last_monthly = await session.execute(
-                text("""
-                    SELECT MAX(entry_date) as last_date
-                    FROM monthly_entries
-                    WHERE patient_id = :patient_id
-                """).bindparams(patient_id=patient_id)
-            )
-            last_monthly_row = last_monthly.first()
-            last_monthly_date = last_monthly_row[0] if last_monthly_row and last_monthly_row[0] is not None else None
-            
-            last_eq5d5l = await session.execute(
-                text("""
-                    SELECT MAX(entry_date) as last_date
-                    FROM eq5d5l_entries
-                    WHERE patient_id = :patient_id
-                """).bindparams(patient_id=patient_id)
-            )
-            last_eq5d5l_row = last_eq5d5l.first()
-            last_eq5d5l_date = last_eq5d5l_row[0] if last_eq5d5l_row and last_eq5d5l_row[0] is not None else None
-            
-            last_daily = await session.execute(
-                text("""
-                    SELECT MAX(entry_date) as last_date
-                    FROM daily_entries
-                    WHERE patient_id = :patient_id
-                """).bindparams(patient_id=patient_id)
-            )
-            last_daily_row = last_daily.first()
-            last_daily_date = last_daily_row[0] if last_daily_row and last_daily_row[0] is not None else None
+            last_weekly_date = patient_row[2] if patient_row[2] is not None else None
+            last_monthly_date = patient_row[3] if patient_row[3] is not None else None
+            last_eq5d5l_date = patient_row[4] if patient_row[4] is not None else None
+            last_daily_date = patient_row[5] if patient_row[5] is not None else None
             
             # Determine next questionnaire using priority logic
             questionnaire_type = None
             reason = None
             
             # Priority 1: EQ-5D-5L (quality of life) - scheduled milestones
+            # Optimized: Check all milestones in one query
             if patient_created_date:
                 days_since_start = (today - patient_created_date).days
                 eq5d5l_milestones = [14, 30, 90, 180, 365]  # 2 weeks, 1 month, 3 months, 6 months, 12 months
                 
-                # Find the next uncompleted milestone
+                # Build list of milestone dates to check
+                milestones_to_check = []
                 for milestone_days in eq5d5l_milestones:
                     milestone_date = patient_created_date + timedelta(days=milestone_days)
-                    
                     # Only consider milestones that are due (within 3 days before to 7 days after)
-                    if today < milestone_date - timedelta(days=3):
-                        continue  # Milestone is too far in the future
-                    
-                    if days_since_start >= milestone_days - 3:  # Allow 3 days early
-                        # Check if we've already filled EQ-5D-5L for this milestone
-                        milestone_filled = False
+                    if today >= milestone_date - timedelta(days=3) and days_since_start >= milestone_days - 3:
+                        milestones_to_check.append((milestone_days, milestone_date))
+                
+                # Check all milestones in one query if there are any to check
+                if milestones_to_check:
+                    # Build date ranges for all milestones
+                    date_ranges = []
+                    for milestone_days, milestone_date in milestones_to_check:
                         window_start = milestone_date - timedelta(days=3)
                         window_end = milestone_date + timedelta(days=7)
+                        date_ranges.append((milestone_days, milestone_date, window_start, window_end))
+                    
+                    # Get all eq5d5l entries in the relevant date range
+                    if date_ranges:
+                        min_date = min(range_item[2] for range_item in date_ranges)
+                        max_date = max(range_item[3] for range_item in date_ranges)
                         
                         check_res = await session.execute(
                             text("""
-                                SELECT COUNT(*) as cnt
+                                SELECT entry_date
                                 FROM eq5d5l_entries
                                 WHERE patient_id = :patient_id
-                                    AND entry_date >= :window_start
-                                    AND entry_date <= :window_end
+                                    AND entry_date >= :min_date
+                                    AND entry_date <= :max_date
                             """).bindparams(
                                 patient_id=patient_id,
-                                window_start=window_start,
-                                window_end=window_end
+                                min_date=min_date,
+                                max_date=max_date
                             )
                         )
-                        check_row = check_res.first()
-                        if check_row and check_row[0] > 0:
-                            milestone_filled = True
+                        filled_dates = {row[0] for row in check_res.fetchall()}
                         
-                        if not milestone_filled:
-                            questionnaire_type = "eq5d5l"
-                            reason = f"EQ-5D-5L milestone at {milestone_days} days ({'due' if days_since_start >= milestone_days else 'upcoming'})"
-                            break  # Found next uncompleted milestone, stop checking
+                        # Find first unfilled milestone
+                        for milestone_days, milestone_date, window_start, window_end in date_ranges:
+                            milestone_filled = any(
+                                window_start <= filled_date <= window_end 
+                                for filled_date in filled_dates
+                            )
+                            
+                            if not milestone_filled:
+                                questionnaire_type = "eq5d5l"
+                                reason = f"EQ-5D-5L milestone at {milestone_days} days ({'due' if days_since_start >= milestone_days else 'upcoming'})"
+                                break  # Found next uncompleted milestone, stop checking
             
             # Priority 2: Weekly (LARS) - once per week
             if not questionnaire_type:
@@ -835,33 +820,20 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                     reason = "First daily questionnaire"
             
             # Check if today's questionnaire is already filled
+            # Optimized: Check in one query using UNION
             is_today_filled = False
             if questionnaire_type:
                 try:
-                    if questionnaire_type == "weekly":
+                    table_map = {
+                        "weekly": "weekly_entries",
+                        "monthly": "monthly_entries",
+                        "eq5d5l": "eq5d5l_entries",
+                        "daily": "daily_entries"
+                    }
+                    table_name = table_map.get(questionnaire_type)
+                    if table_name:
                         check = await session.execute(
-                            text("SELECT COUNT(*) FROM weekly_entries WHERE patient_id = :pid AND entry_date = :today")
-                            .bindparams(pid=patient_id, today=today)
-                        )
-                        check_row = check.first()
-                        is_today_filled = check_row[0] > 0 if check_row else False
-                    elif questionnaire_type == "monthly":
-                        check = await session.execute(
-                            text("SELECT COUNT(*) FROM monthly_entries WHERE patient_id = :pid AND entry_date = :today")
-                            .bindparams(pid=patient_id, today=today)
-                        )
-                        check_row = check.first()
-                        is_today_filled = check_row[0] > 0 if check_row else False
-                    elif questionnaire_type == "eq5d5l":
-                        check = await session.execute(
-                            text("SELECT COUNT(*) FROM eq5d5l_entries WHERE patient_id = :pid AND entry_date = :today")
-                            .bindparams(pid=patient_id, today=today)
-                        )
-                        check_row = check.first()
-                        is_today_filled = check_row[0] > 0 if check_row else False
-                    elif questionnaire_type == "daily":
-                        check = await session.execute(
-                            text("SELECT COUNT(*) FROM daily_entries WHERE patient_id = :pid AND entry_date = :today")
+                            text(f"SELECT COUNT(*) FROM {table_name} WHERE patient_id = :pid AND entry_date = :today")
                             .bindparams(pid=patient_id, today=today)
                         )
                         check_row = check.first()
@@ -888,3 +860,4 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
             status_code=500,
             content={"status": "error", "detail": error_msg, "error_type": error_type}
         )
+
