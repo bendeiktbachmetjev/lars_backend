@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class FoodItem {
   final String name;
@@ -31,67 +32,84 @@ class FoodConsumptionSelector extends StatefulWidget {
 }
 
 class _FoodConsumptionSelectorState extends State<FoodConsumptionSelector> {
-  final List<FoodItem> foodItems = [
-    FoodItem(
-      name: 'Vegetables (all types)',
-      emoji: '🥬',
-      examples: 'Cabbage, broccoli, carrots, beets, cauliflower, zucchini, spinach',
-      unit: 'servings',
-    ),
-    FoodItem(
-      name: 'Root vegetables',
-      emoji: '🍠',
-      examples: 'Potatoes with skin, carrots, parsnips, celery root',
-      unit: 'servings',
-    ),
-    FoodItem(
-      name: 'Whole grains',
-      emoji: '🍞',
-      examples: 'Oatmeal, buckwheat, pearl barley, brown rice, quinoa',
-      unit: 'servings',
-    ),
-    FoodItem(
-      name: 'Whole grain bread',
-      emoji: '🍞',
-      examples: 'Black bread, bran bread, whole grain bread',
-      unit: 'slices',
-    ),
-    FoodItem(
-      name: 'Nuts and seeds',
-      emoji: '🌰',
-      examples: 'Almonds, walnuts, hazelnuts, seeds, flax seeds, chia',
-      unit: 'handfuls',
-    ),
-    FoodItem(
-      name: 'Legumes',
-      emoji: '🌱',
-      examples: 'Beans (any), lentils, chickpeas, peas (including soups)',
-      unit: 'servings',
-    ),
-    FoodItem(
-      name: 'Fruits with skin',
-      emoji: '🍏',
-      examples: 'Apples, pears, plums, apricots (if skin eaten)',
-      unit: 'pieces',
-    ),
-    FoodItem(
-      name: 'Berries (any)',
-      emoji: '🍓',
-      examples: 'Raspberries, strawberries, blueberries, currants, blackberries',
-      unit: 'handfuls',
-    ),
-    FoodItem(
-      name: 'Soft fruits without skin',
-      emoji: '🍌',
-      examples: 'Bananas, melon, watermelon, mango',
-      unit: 'pieces',
-    ),
-    FoodItem(
-      name: 'Muesli and bran cereals',
-      emoji: '🥣',
-      examples: 'Sugar-free muesli, bran cereals, granola',
-      unit: 'servings',
-    ),
+  List<FoodItem> _getFoodItems(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      FoodItem(
+        name: l10n.foodVegetablesAllTypes,
+        emoji: '🥬',
+        examples: l10n.foodVegetablesExamples,
+        unit: l10n.unitServings,
+      ),
+      FoodItem(
+        name: l10n.foodRootVegetables,
+        emoji: '🍠',
+        examples: l10n.foodRootVegetablesExamples,
+        unit: l10n.unitServings,
+      ),
+      FoodItem(
+        name: l10n.foodWholeGrains,
+        emoji: '🍞',
+        examples: l10n.foodWholeGrainsExamples,
+        unit: l10n.unitServings,
+      ),
+      FoodItem(
+        name: l10n.foodWholeGrainBread,
+        emoji: '🍞',
+        examples: l10n.foodWholeGrainBreadExamples,
+        unit: l10n.unitSlices,
+      ),
+      FoodItem(
+        name: l10n.foodNutsAndSeeds,
+        emoji: '🌰',
+        examples: l10n.foodNutsAndSeedsExamples,
+        unit: l10n.unitHandfuls,
+      ),
+      FoodItem(
+        name: l10n.foodLegumes,
+        emoji: '🌱',
+        examples: l10n.foodLegumesExamples,
+        unit: l10n.unitServings,
+      ),
+      FoodItem(
+        name: l10n.foodFruitsWithSkin,
+        emoji: '🍏',
+        examples: l10n.foodFruitsWithSkinExamples,
+        unit: l10n.unitPieces,
+      ),
+      FoodItem(
+        name: l10n.foodBerriesAny,
+        emoji: '🍓',
+        examples: l10n.foodBerriesExamples,
+        unit: l10n.unitHandfuls,
+      ),
+      FoodItem(
+        name: l10n.foodSoftFruitsWithoutSkin,
+        emoji: '🍌',
+        examples: l10n.foodSoftFruitsExamples,
+        unit: l10n.unitPieces,
+      ),
+      FoodItem(
+        name: l10n.foodMuesliAndBranCereals,
+        emoji: '🥣',
+        examples: l10n.foodMuesliExamples,
+        unit: l10n.unitServings,
+      ),
+    ];
+  }
+  
+  // Internal keys for storing selections (language-independent)
+  static const List<String> _foodItemKeys = [
+    'vegetables_all_types',
+    'root_vegetables',
+    'whole_grains',
+    'whole_grain_bread',
+    'nuts_and_seeds',
+    'legumes',
+    'fruits_with_skin',
+    'berries_any',
+    'soft_fruits_without_skin',
+    'muesli_and_bran_cereals',
   ];
 
   final TextStyle labelStyle = const TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
@@ -132,13 +150,17 @@ class _FoodConsumptionSelectorState extends State<FoodConsumptionSelector> {
 
   @override
   Widget build(BuildContext context) {
+    final foodItems = _getFoodItems(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text('What did you consume today?', style: labelStyle, textAlign: TextAlign.center),
+        Text(AppLocalizations.of(context)!.whatDidYouConsumeToday, style: labelStyle, textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        ...foodItems.map((foodItem) {
-          final int currentQuantity = widget.selectedItems[foodItem.name] ?? 0;
+        ...foodItems.asMap().entries.map((entry) {
+          final index = entry.key;
+          final foodItem = entry.value;
+          final String itemKey = _foodItemKeys[index];
+          final int currentQuantity = widget.selectedItems[itemKey] ?? 0;
           final bool isSelected = currentQuantity > 0;
           
           return Container(
@@ -186,7 +208,7 @@ class _FoodConsumptionSelectorState extends State<FoodConsumptionSelector> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Quantity (${foodItem.unit}):',
+                      AppLocalizations.of(context)!.quantity(foodItem.unit),
                       style: optionStyle,
                     ),
                     _buildCounter(
@@ -194,9 +216,9 @@ class _FoodConsumptionSelectorState extends State<FoodConsumptionSelector> {
                       onChanged: (newQuantity) {
                         final newSelection = Map<String, int>.from(widget.selectedItems);
                         if (newQuantity == 0) {
-                          newSelection.remove(foodItem.name);
+                          newSelection.remove(itemKey);
                         } else {
-                          newSelection[foodItem.name] = newQuantity;
+                          newSelection[itemKey] = newQuantity;
                         }
                         widget.onChanged(newSelection);
                       },

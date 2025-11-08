@@ -5,6 +5,7 @@ import 'monthly_questionnaire_screen.dart';
 import 'eq5d5l_questionnaire_screen.dart';
 import '../widgets/lars_line_chart.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 // Import TimePeriod enum
 import '../widgets/lars_line_chart.dart' show TimePeriod;
@@ -40,11 +41,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final patientCode = await api.getPatientCode();
       
       if (patientCode == null || patientCode.isEmpty) {
+        // Error message will be localized when displayed
         setState(() {
           _nextQuestionnaireType = null;
           _isTodayFilled = false;
           _isLoadingQuestionnaire = false;
-          _errorMessage = 'Please set your patient code in Profile';
+          _errorMessage = 'patient_code_not_set';
         });
         return;
       }
@@ -63,17 +65,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _nextQuestionnaireType = null;
           _isTodayFilled = false;
           _isLoadingQuestionnaire = false;
-          _errorMessage = 'Failed to load questionnaire info';
+          _errorMessage = 'failed_to_load';
         });
       }
-    } catch (e) {
-      setState(() {
-        _nextQuestionnaireType = null;
-        _isTodayFilled = false;
-        _isLoadingQuestionnaire = false;
-        _errorMessage = 'Error: ${e.toString()}';
-      });
-    }
+      } catch (e) {
+        setState(() {
+          _nextQuestionnaireType = null;
+          _isTodayFilled = false;
+          _isLoadingQuestionnaire = false;
+          _errorMessage = 'error_prefix:${e.toString()}';
+        });
+      }
   }
 
   void _openNextQuestionnaire(BuildContext context) async {
@@ -108,18 +110,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _loadNextQuestionnaire();
   }
 
-  String _getQuestionnaireName() {
+  String _getQuestionnaireName(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     switch (_nextQuestionnaireType) {
       case 'daily':
-        return 'Daily Questionnaire';
+        return l10n.dailyQuestionnaire;
       case 'weekly':
-        return 'Weekly Questionnaire (LARS)';
+        return l10n.weeklyQuestionnaire;
       case 'monthly':
-        return 'Monthly Questionnaire';
+        return l10n.monthlyQuestionnaire;
       case 'eq5d5l':
-        return 'Quality of Life Questionnaire (EQ-5D-5L)';
+        return l10n.qualityOfLifeQuestionnaire;
       default:
-        return 'No questionnaire needed';
+        return l10n.noQuestionnaireNeeded;
     }
   }
 
@@ -133,9 +136,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             const StatisticsSection(),
             const SizedBox(height: 32),
-            const Text(
-              "Today's Questionnaire",
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context)!.todaysQuestionnaire,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
@@ -156,7 +159,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _errorMessage!,
+                      _errorMessage == 'patient_code_not_set'
+                          ? AppLocalizations.of(context)!.pleaseSetPatientCode
+                          : _errorMessage == 'failed_to_load'
+                              ? AppLocalizations.of(context)!.failedToLoadQuestionnaireInfo
+                              : _errorMessage!.startsWith('error_prefix:')
+                                  ? AppLocalizations.of(context)!.error(_errorMessage!.substring('error_prefix:'.length))
+                                  : _errorMessage!,
                       style: TextStyle(
                         color: Colors.red[700],
                         fontWeight: FontWeight.w600,
@@ -169,16 +178,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => _loadNextQuestionnaire(),
-                child: const Text('Retry'),
+                child: Text(AppLocalizations.of(context)!.retry),
               ),
             ] else if (_nextQuestionnaireType == null) ...[
               Row(
                 children: [
                   Icon(Icons.check_circle, color: Colors.green[600], size: 28),
                   const SizedBox(width: 8),
-                  const Text(
-                    'All questionnaires are up to date',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context)!.allQuestionnairesUpToDate,
+                    style: const TextStyle(
                       color: Colors.green,
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
@@ -196,7 +205,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _getQuestionnaireName(),
+                          _getQuestionnaireName(context),
                           style: const TextStyle(
                             color: Colors.amber,
                             fontWeight: FontWeight.w600,
@@ -235,7 +244,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   onPressed: () => _openNextQuestionnaire(context),
-                  child: const Text('Fill It Now'),
+                  child: Text(AppLocalizations.of(context)!.fillItNow),
                 ),
               ),
             ] else ...[
@@ -245,7 +254,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${_getQuestionnaireName()} - Completed',
+                      '${_getQuestionnaireName(context)} - Completed',
                       style: const TextStyle(
                         color: Colors.green,
                         fontWeight: FontWeight.w600,
@@ -256,8 +265,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ],
-            const SizedBox(height: 32),
-            // Test buttons for all questionnaires (могут остаться для ручного теста)
           ],
         ),
       ),
@@ -319,18 +326,11 @@ class _StatisticsSectionState extends State<StatisticsSection> {
     }
   }
 
-  String _getStatisticsText(String period) {
+  String _getStatisticsText(String period, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     if (_larsData == null || _larsData!.isEmpty) {
-      switch (period) {
-        case 'weekly':
-          return 'Complete weekly questionnaires to see your LARS score statistics';
-        case 'monthly':
-          return 'Complete weekly questionnaires to see your LARS score statistics';
-        case 'yearly':
-          return 'Complete weekly questionnaires to see your LARS score statistics';
-        default:
-          return 'Complete weekly questionnaires to see your LARS score statistics';
-      }
+      return l10n.completeWeeklyQuestionnairesToSeeStatistics;
     }
 
     final scores = _larsData!
@@ -339,16 +339,7 @@ class _StatisticsSectionState extends State<StatisticsSection> {
         .toList();
 
     if (scores.length < 2) {
-      switch (period) {
-        case 'weekly':
-          return 'Complete more weekly questionnaires to see improvement trends';
-        case 'monthly':
-          return 'Complete more weekly questionnaires to see improvement trends';
-        case 'yearly':
-          return 'Complete more weekly questionnaires to see improvement trends';
-        default:
-          return 'Complete more weekly questionnaires to see improvement trends';
-      }
+      return l10n.completeMoreWeeklyQuestionnaires;
     }
 
     final firstScore = scores.first;
@@ -388,9 +379,9 @@ class _StatisticsSectionState extends State<StatisticsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Statistics',
-          style: TextStyle(
+        Text(
+          AppLocalizations.of(context)!.statistics,
+          style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
@@ -426,22 +417,28 @@ class _StatisticsSectionState extends State<StatisticsSection> {
           ),
           child: Row(
             children: [
-              Icon(
-                _larsData != null && _larsData!.isNotEmpty && _larsData!.where((item) => item['score'] != null).length >= 2
-                    ? (_getStatisticsText(_selectedPeriod).contains('improved') 
-                        ? Icons.trending_up 
-                        : _getStatisticsText(_selectedPeriod).contains('stable')
-                            ? Icons.trending_flat
-                            : Icons.trending_down)
-                    : Icons.info_outline,
-                color: _larsData != null && _larsData!.isNotEmpty && _larsData!.where((item) => item['score'] != null).length >= 2
-                    ? (_getStatisticsText(_selectedPeriod).contains('improved') 
-                        ? Colors.green 
-                        : _getStatisticsText(_selectedPeriod).contains('stable')
-                            ? Colors.orange
-                            : Colors.red)
-                    : Colors.grey,
-                size: 28,
+              Builder(
+                builder: (context) {
+                  final statsText = _getStatisticsText(_selectedPeriod, context);
+                  final hasEnoughData = _larsData != null && _larsData!.isNotEmpty && _larsData!.where((item) => item['score'] != null).length >= 2;
+                  return Icon(
+                    hasEnoughData
+                        ? (statsText.contains('improved') 
+                            ? Icons.trending_up 
+                            : statsText.contains('stable')
+                                ? Icons.trending_flat
+                                : Icons.trending_down)
+                        : Icons.info_outline,
+                    color: hasEnoughData
+                        ? (statsText.contains('improved') 
+                            ? Colors.green 
+                            : statsText.contains('stable')
+                                ? Colors.orange
+                                : Colors.red)
+                        : Colors.grey,
+                    size: 28,
+                  );
+                },
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -452,7 +449,7 @@ class _StatisticsSectionState extends State<StatisticsSection> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Text(
-                        _getStatisticsText(_selectedPeriod),
+                        _getStatisticsText(_selectedPeriod, context),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                       ),
               ),

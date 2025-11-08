@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class DrinkItem {
   final String name;
@@ -31,55 +32,70 @@ class DrinkConsumptionSelector extends StatefulWidget {
 }
 
 class _DrinkConsumptionSelectorState extends State<DrinkConsumptionSelector> {
-  final List<DrinkItem> drinkItems = [
-    DrinkItem(
-      name: 'Water',
-      emoji: '💧',
-      examples: 'Plain water, mineral water, filtered water',
-      unit: 'glasses',
-    ),
-    DrinkItem(
-      name: 'Coffee',
-      emoji: '☕',
-      examples: 'Espresso, cappuccino, americano, latte',
-      unit: 'cups',
-    ),
-    DrinkItem(
-      name: 'Tea',
-      emoji: '🫖',
-      examples: 'Black tea, green tea, herbal tea, chamomile',
-      unit: 'cups',
-    ),
-    DrinkItem(
-      name: 'Alcohol',
-      emoji: '🍷',
-      examples: 'Beer, wine, spirits, cocktails',
-      unit: 'drinks',
-    ),
-    DrinkItem(
-      name: 'Carbonated drinks',
-      emoji: '🥤',
-      examples: 'Cola, sprite, fanta, sparkling water',
-      unit: 'cans',
-    ),
-    DrinkItem(
-      name: 'Juices',
-      emoji: '🧃',
-      examples: 'Orange juice, apple juice, grape juice, smoothies',
-      unit: 'glasses',
-    ),
-    DrinkItem(
-      name: 'Dairy drinks',
-      emoji: '🥛',
-      examples: 'Milk, kefir, yogurt drinks, milkshakes',
-      unit: 'glasses',
-    ),
-    DrinkItem(
-      name: 'Energy drinks',
-      emoji: '⚡',
-      examples: 'Red Bull, Monster, energy shots',
-      unit: 'cans',
-    ),
+  List<DrinkItem> _getDrinkItems(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      DrinkItem(
+        name: l10n.drinkWater,
+        emoji: '💧',
+        examples: l10n.drinkWaterExamples,
+        unit: l10n.unitGlasses,
+      ),
+      DrinkItem(
+        name: l10n.drinkCoffee,
+        emoji: '☕',
+        examples: l10n.drinkCoffeeExamples,
+        unit: l10n.unitCups,
+      ),
+      DrinkItem(
+        name: l10n.drinkTea,
+        emoji: '🫖',
+        examples: l10n.drinkTeaExamples,
+        unit: l10n.unitCups,
+      ),
+      DrinkItem(
+        name: l10n.drinkAlcohol,
+        emoji: '🍷',
+        examples: l10n.drinkAlcoholExamples,
+        unit: l10n.unitDrinks,
+      ),
+      DrinkItem(
+        name: l10n.drinkCarbonatedDrinks,
+        emoji: '🥤',
+        examples: l10n.drinkCarbonatedExamples,
+        unit: l10n.unitCans,
+      ),
+      DrinkItem(
+        name: l10n.drinkJuices,
+        emoji: '🧃',
+        examples: l10n.drinkJuicesExamples,
+        unit: l10n.unitGlasses,
+      ),
+      DrinkItem(
+        name: l10n.drinkDairyDrinks,
+        emoji: '🥛',
+        examples: l10n.drinkDairyExamples,
+        unit: l10n.unitGlasses,
+      ),
+      DrinkItem(
+        name: l10n.drinkEnergyDrinks,
+        emoji: '⚡',
+        examples: l10n.drinkEnergyExamples,
+        unit: l10n.unitCans,
+      ),
+    ];
+  }
+  
+  // Internal keys for storing selections (language-independent)
+  static const List<String> _drinkItemKeys = [
+    'water',
+    'coffee',
+    'tea',
+    'alcohol',
+    'carbonated_drinks',
+    'juices',
+    'dairy_drinks',
+    'energy_drinks',
   ];
 
   final TextStyle labelStyle = const TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
@@ -120,13 +136,17 @@ class _DrinkConsumptionSelectorState extends State<DrinkConsumptionSelector> {
 
   @override
   Widget build(BuildContext context) {
+    final drinkItems = _getDrinkItems(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text('What did you drink today?', style: labelStyle, textAlign: TextAlign.center),
+        Text(AppLocalizations.of(context)!.whatDidYouDrinkToday, style: labelStyle, textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        ...drinkItems.map((drinkItem) {
-          final int currentQuantity = widget.selectedItems[drinkItem.name] ?? 0;
+        ...drinkItems.asMap().entries.map((entry) {
+          final index = entry.key;
+          final drinkItem = entry.value;
+          final String itemKey = _drinkItemKeys[index];
+          final int currentQuantity = widget.selectedItems[itemKey] ?? 0;
           final bool isSelected = currentQuantity > 0;
           
           return Container(
@@ -174,7 +194,7 @@ class _DrinkConsumptionSelectorState extends State<DrinkConsumptionSelector> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Quantity (${drinkItem.unit}):',
+                      AppLocalizations.of(context)!.quantity(drinkItem.unit),
                       style: optionStyle,
                     ),
                     _buildCounter(
@@ -182,9 +202,9 @@ class _DrinkConsumptionSelectorState extends State<DrinkConsumptionSelector> {
                       onChanged: (newQuantity) {
                         final newSelection = Map<String, int>.from(widget.selectedItems);
                         if (newQuantity == 0) {
-                          newSelection.remove(drinkItem.name);
+                          newSelection.remove(itemKey);
                         } else {
-                          newSelection[drinkItem.name] = newQuantity;
+                          newSelection[itemKey] = newQuantity;
                         }
                         widget.onChanged(newSelection);
                       },

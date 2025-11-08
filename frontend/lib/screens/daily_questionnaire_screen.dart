@@ -3,6 +3,7 @@ import '../widgets/bristol_scale_selector.dart';
 import '../services/api_service.dart';
 import '../widgets/food_consumption_selector.dart';
 import '../widgets/drink_consumption_selector.dart';
+import '../l10n/app_localizations.dart';
 
 class DailyQuestionnaireScreen extends StatefulWidget {
   const DailyQuestionnaireScreen({super.key});
@@ -63,13 +64,14 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
     );
   }
 
-  Widget _buildYesNo({required String value, required void Function(String) onChanged}) {
+  Widget _buildYesNo(BuildContext context, {required String value, required void Function(String) onChanged}) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildOption('Yes', value == 'Yes', () => onChanged('Yes')),
+        _buildOption(l10n.yes, value == 'Yes', () => onChanged('Yes')),
         const SizedBox(width: 10),
-        _buildOption('No', value == 'No', () => onChanged('No')),
+        _buildOption(l10n.no, value == 'No', () => onChanged('No')),
       ],
     );
   }
@@ -161,7 +163,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daily Symptoms'),
+        title: Text(AppLocalizations.of(context)!.dailySymptoms),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -190,7 +192,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                             ),
                             child: Column(
                               children: [
-                                Text('Stool/day', style: labelStyle),
+                                Text(AppLocalizations.of(context)!.stoolPerDay, style: labelStyle),
                                 const SizedBox(height: 8),
                                 _buildCounter(
                                   value: stoolCount,
@@ -212,7 +214,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                             ),
                             child: Column(
                               children: [
-                                Text('Pads used', style: labelStyle),
+                                Text(AppLocalizations.of(context)!.padsUsed, style: labelStyle),
                                 const SizedBox(height: 8),
                                 _buildCounter(
                                   value: padsUsed,
@@ -241,9 +243,10 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('Urgent', style: labelStyle),
+                                Text(AppLocalizations.of(context)!.urgent, style: labelStyle),
                                 const SizedBox(height: 8),
                                 _buildYesNo(
+                                  context,
                                   value: urgency,
                                   onChanged: (v) => setState(() => urgency = v),
                                 ),
@@ -264,9 +267,10 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('Night stools', style: labelStyle),
+                                Text(AppLocalizations.of(context)!.nightStools, style: labelStyle),
                                 const SizedBox(height: 8),
                                 _buildYesNo(
+                                  context,
                                   value: nightStools,
                                   onChanged: (v) => setState(() => nightStools = v),
                                 ),
@@ -292,21 +296,21 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                             ),
                             child: Column(
                               children: [
-                                Text('Stool leakage', style: labelStyle),
+                                Text(AppLocalizations.of(context)!.stoolLeakage, style: labelStyle),
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    _buildOption('None', leakage == 'None', () => setState(() => leakage = 'None')),
+                                    _buildOption(AppLocalizations.of(context)!.none, leakage == 'None', () => setState(() => leakage = 'None')),
                                     const SizedBox(width: 10),
-                                    _buildOption('Liquid', leakage == 'Liquid', () => setState(() => leakage = 'Liquid')),
+                                    _buildOption(AppLocalizations.of(context)!.liquid, leakage == 'Liquid', () => setState(() => leakage = 'Liquid')),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    _buildOption('Solid', leakage == 'Solid', () => setState(() => leakage = 'Solid')),
+                                    _buildOption(AppLocalizations.of(context)!.solid, leakage == 'Solid', () => setState(() => leakage = 'Solid')),
                                   ],
                                 ),
                               ],
@@ -327,14 +331,14 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Center(child: Text('Incomplete evacuation', style: labelStyle)),
+                                Center(child: Text(AppLocalizations.of(context)!.incompleteEvacuation, style: labelStyle)),
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    _buildOption('Yes', incompleteEvac == 'Yes', () => setState(() => incompleteEvac = 'Yes')),
+                                    _buildOption(AppLocalizations.of(context)!.yes, incompleteEvac == 'Yes', () => setState(() => incompleteEvac = 'Yes')),
                                     const SizedBox(width: 10),
-                                    _buildOption('No', incompleteEvac == 'No', () => setState(() => incompleteEvac = 'No')),
+                                    _buildOption(AppLocalizations.of(context)!.no, incompleteEvac == 'No', () => setState(() => incompleteEvac = 'No')),
                                   ],
                                 ),
                               ],
@@ -346,14 +350,14 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                     const SizedBox(height: 20),
                     // Bloating
                     _buildSlider(
-                      label: 'Bloating',
+                      label: AppLocalizations.of(context)!.bloating,
                       value: bloating,
                       onChanged: (v) => setState(() => bloating = v),
                     ),
                     const SizedBox(height: 20),
                     // Impact on life
                     _buildSlider(
-                      label: 'Impact on life',
+                      label: AppLocalizations.of(context)!.impactOnLife,
                       value: impactScore,
                       onChanged: (v) => setState(() => impactScore = v),
                     ),
@@ -407,7 +411,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                         if (code == null || code.isEmpty) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please set your patient code in Profile')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.pleaseSetPatientCode)),
                           );
                           return;
                         }
@@ -435,23 +439,23 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                           if (resp.statusCode >= 200 && resp.statusCode < 300) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Submitted successfully')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submittedSuccessfully)),
                             );
                             Navigator.of(context).pop();
                           } else {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Submit failed: ${resp.statusCode}')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submitFailed(resp.statusCode))),
                             );
                           }
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.error(e.toString()))),
                           );
                         }
                       },
-                      child: const Text('Submit'),
+                      child: Text(AppLocalizations.of(context)!.submit),
                     ),
                   ),
                 ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,7 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Patient code saved')),
+      SnackBar(content: Text(AppLocalizations.of(context)!.patientCodeSaved)),
     );
   }
 
@@ -44,21 +46,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Patient code cleared')),
+      SnackBar(content: Text(AppLocalizations.of(context)!.patientCodeCleared)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
-      ),
-      body: _loading
+    final l10n = AppLocalizations.of(context)!;
+    return _loading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
               child: SingleChildScrollView(
@@ -67,40 +62,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 16),
-                      Container(
-                        width: 110,
-                        height: 110,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF3A8DFF), Color(0xFF8F5CFF)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 16,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.person, size: 64, color: Colors.white),
-                      ),
-                      const SizedBox(height: 18),
-                      const Text(
-                        'iLars Patient',
-                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _savedCode == null ? 'No patient code' : 'Code: $_savedCode',
-                        style: const TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -118,16 +79,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Patient Code',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            Text(
+                            l10n.patientCode,
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 10),
                             TextField(
                               controller: _codeController,
-                              decoration: const InputDecoration(
-                                hintText: 'Enter your code',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                              hintText: l10n.enterYourCode,
+                              border: const OutlineInputBorder(),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -135,21 +96,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               children: [
                                 ElevatedButton(
                                   onPressed: _save,
-                                  child: const Text('Save'),
+                                child: Text(l10n.save),
                                 ),
                                 const SizedBox(width: 12),
                                 OutlinedButton(
                                   onPressed: _clear,
-                                  child: const Text('Logout'),
+                                child: Text(l10n.logout),
                                 ),
                               ],
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
                     ],
                   ),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            title: Text(l10n.termsOfUse),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const TermsOfUseScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            title: Text(l10n.privacyPolicy),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const PrivacyPolicyScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                 ),
               ),
             ),
@@ -195,6 +197,94 @@ class _ProfileStatCard extends StatelessWidget {
             style: const TextStyle(fontSize: 15, color: Colors.black87, fontWeight: FontWeight.w500),
           ),
         ],
+      ),
+    );
+  }
+} 
+
+class TermsOfUseScreen extends StatelessWidget {
+  const TermsOfUseScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.termsOfUse),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        centerTitle: true,
+      ),
+      body: FutureBuilder<String>(
+        future: rootBundle.loadString('assets/legal/terms_of_use.md'),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Failed to load Terms of Use.',
+                style: const TextStyle(fontSize: 16, color: Colors.red),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                snapshot.data ?? '',
+                style: const TextStyle(fontSize: 16, height: 1.4),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class PrivacyPolicyScreen extends StatelessWidget {
+  const PrivacyPolicyScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.privacyPolicy),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        centerTitle: true,
+      ),
+      body: FutureBuilder<String>(
+        future: rootBundle.loadString('assets/legal/privacy_policy.md'),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Failed to load Privacy Policy.',
+                style: const TextStyle(fontSize: 16, color: Colors.red),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SingleChildScrollView(
+              child: SelectableText(
+                snapshot.data ?? '',
+                style: const TextStyle(fontSize: 16, height: 1.4),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

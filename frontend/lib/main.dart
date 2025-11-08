@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/profile_screen.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  
   runApp(const MyApp());
 }
 
@@ -12,7 +21,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LARS Test App',
+      title: 'iLARS',
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'), // English
+        Locale('lt'), // Lithuanian
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
@@ -38,10 +57,33 @@ class _HomePageState extends State<HomePage> {
     ProfileScreen(),
   ];
 
+  bool _notificationScheduled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_notificationScheduled) {
+      _notificationScheduled = true;
+      _scheduleNotification();
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  Future<void> _scheduleNotification() async {
+    // Get localized strings
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return;
+
+    final notificationService = NotificationService();
+    await notificationService.scheduleDailyNotification(
+      title: l10n.notificationTitle,
+      body: l10n.notificationBody,
+    );
   }
 
   @override
@@ -59,9 +101,9 @@ class _HomePageState extends State<HomePage> {
               end: Alignment.bottomRight,
             ).createShader(bounds);
           },
-          child: const Text(
-            'iLars',
-            style: TextStyle(
+          child: Text(
+            AppLocalizations.of(context)!.appTitle,
+            style: const TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.w900,
               color: Colors.white,
@@ -72,11 +114,13 @@ class _HomePageState extends State<HomePage> {
       ),
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
         items: [
           BottomNavigationBarItem(
             icon: GradientIconLabel(
               icon: Icons.dashboard,
-              label: 'Dashboard',
+              label: AppLocalizations.of(context)!.dashboard,
               selected: _selectedIndex == 0,
             ),
             label: '',
@@ -84,7 +128,7 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(
             icon: GradientIconLabel(
               icon: Icons.person,
-              label: 'Profile',
+              label: AppLocalizations.of(context)!.profile,
               selected: _selectedIndex == 1,
             ),
             label: '',

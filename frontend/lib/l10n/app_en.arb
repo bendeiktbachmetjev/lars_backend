@@ -1,10 +1,10 @@
 {
   "@@locale": "en",
-  "appTitle": "iLars",
+  "appTitle": "iLARS",
   "@appTitle": {
     "description": "The application title"
   },
-  "appName": "LARS Test App",
+  "appName": "iLARS",
   "@appName": {
     "description": "Application name for app store"
   },
@@ -84,7 +84,7 @@
   "@completeMoreWeeklyQuestionnaires": {
     "description": "Message when need more data for trends"
   },
-  "ilarsPatient": "iLars Patient",
+  "ilarsPatient": "iLARS Patient",
   "@ilarsPatient": {
     "description": "Patient profile title"
   },
@@ -654,6 +654,14 @@
   "healthTodayDescription": "We would like to know how good or bad your health is TODAY. This scale is numbered from 0 to 100. 100 means the best health you can imagine. 0 means the worst health you can imagine.",
   "@healthTodayDescription": {"description": "VAS description"},
   "yourHealthTodayIs": "YOUR HEALTH TODAY =",
-  "@yourHealthTodayIs": {"description": "Label before numeric value"}
+  "@yourHealthTodayIs": {"description": "Label before numeric value"},
+  "termsOfUse": "Terms of Use",
+  "@termsOfUse": {"description": "Legal: Terms of Use title"},
+  "privacyPolicy": "Privacy Policy",
+  "@privacyPolicy": {"description": "Legal: Privacy Policy title"},
+  "termsOfUseComingSoon": "Coming soon: Terms of Use content will appear here.",
+  "@termsOfUseComingSoon": {"description": "Placeholder text for Terms of Use"},
+  "privacyPolicyComingSoon": "Coming soon: Privacy Policy content will appear here.",
+  "@privacyPolicyComingSoon": {"description": "Placeholder text for Privacy Policy"}
 }
 

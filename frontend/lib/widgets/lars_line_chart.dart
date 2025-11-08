@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 /// Enum for different time periods
 enum TimePeriod { weekly, monthly, yearly }
@@ -41,7 +42,7 @@ class _LarsLineChartState extends State<LarsLineChart> {
         setState(() {
           _isLoading = false;
           _data = [];
-          _errorMessage = 'No patient code set';
+          _errorMessage = 'No patient code set'; // Will be localized when displayed
         });
         return;
       }
@@ -82,11 +83,11 @@ class _LarsLineChartState extends State<LarsLineChart> {
         });
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to fetch LARS data: ${e.toString()}';
-        _data = [];
-      });
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to fetch LARS data:${e.toString()}'; // Will be localized when displayed
+          _data = [];
+        });
     }
   }
 
@@ -172,11 +173,11 @@ class _LarsLineChartState extends State<LarsLineChart> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildPeriodButton(TimePeriod.weekly, 'Weekly'),
+              _buildPeriodButton(TimePeriod.weekly, AppLocalizations.of(context)!.weekly),
               const SizedBox(width: 8),
-              _buildPeriodButton(TimePeriod.monthly, 'Monthly'),
+              _buildPeriodButton(TimePeriod.monthly, AppLocalizations.of(context)!.monthly),
               const SizedBox(width: 8),
-              _buildPeriodButton(TimePeriod.yearly, 'Yearly'),
+              _buildPeriodButton(TimePeriod.yearly, AppLocalizations.of(context)!.yearly),
             ],
           ),
         ),
@@ -195,7 +196,11 @@ class _LarsLineChartState extends State<LarsLineChart> {
                             Icon(Icons.bar_chart, size: 48, color: Colors.grey[400]),
                             const SizedBox(height: 8),
                             Text(
-                              _errorMessage!,
+                              _errorMessage == 'No patient code set'
+                                  ? AppLocalizations.of(context)!.noPatientCodeSet
+                                  : _errorMessage!.startsWith('Failed to fetch LARS data:')
+                                      ? AppLocalizations.of(context)!.failedToFetchLarsData(_errorMessage!.substring('Failed to fetch LARS data:'.length).trim())
+                                      : _errorMessage!,
                               style: TextStyle(color: Colors.grey[600], fontSize: 14),
                               textAlign: TextAlign.center,
                             ),
@@ -210,7 +215,7 @@ class _LarsLineChartState extends State<LarsLineChart> {
                                 Icon(Icons.bar_chart, size: 48, color: Colors.grey[400]),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'No data available yet',
+                                  AppLocalizations.of(context)!.noDataAvailableYet,
                                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                                   textAlign: TextAlign.center,
                                 ),

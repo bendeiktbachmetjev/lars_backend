@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 class MonthlyQuestionnaireScreen extends StatefulWidget {
   const MonthlyQuestionnaireScreen({super.key});
@@ -57,7 +58,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monthly Quality of Life '),
+        title: Text(AppLocalizations.of(context)!.monthlyQualityOfLife),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -73,7 +74,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                   children: [
                     const SizedBox(height: 12),
                     _buildLikertSlider(
-                      label: 'I avoid traveling due to bowel problems',
+                      label: AppLocalizations.of(context)!.avoidTraveling,
                       value: avoidTravel,
                       min: 1,
                       max: 4,
@@ -81,7 +82,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                     ),
                     const SizedBox(height: 24),
                     _buildLikertSlider(
-                      label: 'I avoid social activities',
+                      label: AppLocalizations.of(context)!.avoidSocialActivities,
                       value: avoidSocial,
                       min: 1,
                       max: 4,
@@ -89,7 +90,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                     ),
                     const SizedBox(height: 24),
                     _buildLikertSlider(
-                      label: 'I feel embarrassed by my condition',
+                      label: AppLocalizations.of(context)!.feelEmbarrassed,
                       value: embarrassed,
                       min: 1,
                       max: 4,
@@ -97,7 +98,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                     ),
                     const SizedBox(height: 24),
                     _buildLikertSlider(
-                      label: 'I worry others will notice my symptoms',
+                      label: AppLocalizations.of(context)!.worryOthersNotice,
                       value: worryNotice,
                       min: 1,
                       max: 4,
@@ -105,7 +106,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                     ),
                     const SizedBox(height: 24),
                     _buildLikertSlider(
-                      label: 'I feel depressed because of bowel function',
+                      label: AppLocalizations.of(context)!.feelDepressed,
                       value: depressed,
                       min: 1,
                       max: 4,
@@ -113,7 +114,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                     ),
                     const SizedBox(height: 24),
                     _buildLikertSlider(
-                      label: 'I feel in control of my bowel symptoms',
+                      label: AppLocalizations.of(context)!.feelInControl,
                       value: control,
                       min: 0,
                       max: 10,
@@ -121,7 +122,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                     ),
                     const SizedBox(height: 24),
                     _buildLikertSlider(
-                      label: 'Overall satisfaction with bowel function',
+                      label: AppLocalizations.of(context)!.overallSatisfaction,
                       value: satisfaction,
                       min: 0,
                       max: 10,
@@ -159,7 +160,7 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                         if (code == null || code.isEmpty) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please set your patient code in Profile')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.pleaseSetPatientCode)),
                           );
                           return;
                         }
@@ -184,23 +185,23 @@ class _MonthlyQuestionnaireScreenState extends State<MonthlyQuestionnaireScreen>
                           if (resp.statusCode >= 200 && resp.statusCode < 300) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Submitted successfully')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submittedSuccessfully)),
                             );
                             Navigator.of(context).pop();
                           } else {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Submit failed: ${resp.statusCode}')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submitFailed(resp.statusCode))),
                             );
                           }
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.error(e.toString()))),
                           );
                         }
                       },
-                      child: const Text('Submit'),
+                      child: Text(AppLocalizations.of(context)!.submit),
                     ),
                   ),
                 ),

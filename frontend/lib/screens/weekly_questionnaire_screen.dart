@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../l10n/app_localizations.dart';
 
 class WeeklyQuestionnaireScreen extends StatefulWidget {
   const WeeklyQuestionnaireScreen({super.key});
@@ -87,7 +88,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('LARS Score Questionnaire'),
+        title: Text(AppLocalizations.of(context)!.larsScoreQuestionnaire),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -102,42 +103,63 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
                 child: ListView(
                   children: [
                     const SizedBox(height: 12),
-                    Text('Do you ever have occasions when you cannot control your flatus (wind)?', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.flatusControlQuestion, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
-                      options: ['No, never', 'Yes, less than once per week', 'Yes, at least once per week'],
+                      options: [
+                        AppLocalizations.of(context)!.noNever,
+                        AppLocalizations.of(context)!.yesLessThanOncePerWeek,
+                        AppLocalizations.of(context)!.yesAtLeastOncePerWeek,
+                      ],
                       value: flatusControl,
                       onChanged: (v) => setState(() => flatusControl = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('Do you ever have any accidental leakage of liquid stool?', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.liquidStoolLeakageQuestion, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
-                      options: ['No, never', 'Yes, less than once per week', 'Yes, at least once per week'],
+                      options: [
+                        AppLocalizations.of(context)!.noNever,
+                        AppLocalizations.of(context)!.yesLessThanOncePerWeek,
+                        AppLocalizations.of(context)!.yesAtLeastOncePerWeek,
+                      ],
                       value: liquidStoolLeakage,
                       onChanged: (v) => setState(() => liquidStoolLeakage = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('How often do you open your bowels?', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.bowelFrequencyQuestion, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
-                      options: ['More than 7 times per day (24 hours)', '4-7 times per day (24 hours)', '1-3 times per day (24 hours)', 'Less than once per day (24 hours)'],
+                      options: [
+                        AppLocalizations.of(context)!.moreThan7TimesPerDay,
+                        AppLocalizations.of(context)!.timesPerDay('4', '7'),
+                        AppLocalizations.of(context)!.timesPerDay('1', '3'),
+                        AppLocalizations.of(context)!.lessThanOncePerDay,
+                      ],
                       value: bowelFrequency,
                       onChanged: (v) => setState(() => bowelFrequency = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('Do you ever have to open your bowels again within one hour of the last bowel opening?', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.repeatBowelOpeningQuestion, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
-                      options: ['No, never', 'Yes, less than once per week', 'Yes, at least once per week'],
+                      options: [
+                        AppLocalizations.of(context)!.noNever,
+                        AppLocalizations.of(context)!.yesLessThanOncePerWeek,
+                        AppLocalizations.of(context)!.yesAtLeastOncePerWeek,
+                      ],
                       value: repeatBowelOpening,
                       onChanged: (v) => setState(() => repeatBowelOpening = v),
                     ),
                     const SizedBox(height: 24),
-                    Text('Do you ever have such a strong urge to open your bowels that you have to rush to the toilet?', style: labelStyle),
+                    Text(AppLocalizations.of(context)!.urgencyToToiletQuestion, style: labelStyle),
                     const SizedBox(height: 8),
                     _buildSelector(
-                      options: ['No, never', 'Yes, less than once per week', 'Yes, at least once per week'],
+                      options: [
+                        AppLocalizations.of(context)!.noNever,
+                        AppLocalizations.of(context)!.yesLessThanOncePerWeek,
+                        AppLocalizations.of(context)!.yesAtLeastOncePerWeek,
+                      ],
                       value: urgencyToToilet,
                       onChanged: (v) => setState(() => urgencyToToilet = v),
                     ),
@@ -152,7 +174,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Total Score:', style: labelStyle.copyWith(fontSize: 18)),
+                          Text(AppLocalizations.of(context)!.totalScore, style: labelStyle.copyWith(fontSize: 18)),
                           Text(
                             totalScore.toString(),
                             style: labelStyle.copyWith(
@@ -195,7 +217,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
                         if (code == null || code.isEmpty) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please set your patient code in Profile')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.pleaseSetPatientCode)),
                           );
                           return;
                         }
@@ -213,23 +235,23 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
                           if (resp.statusCode >= 200 && resp.statusCode < 300) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Submitted successfully')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submittedSuccessfully)),
                             );
                             Navigator.of(context).pop();
                           } else {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Submit failed: ${resp.statusCode}')),
+                              SnackBar(content: Text(AppLocalizations.of(context)!.submitFailed(resp.statusCode))),
                             );
                           }
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
+                            SnackBar(content: Text(AppLocalizations.of(context)!.error(e.toString()))),
                           );
                         }
                       },
-                      child: const Text('Submit'),
+                      child: Text(AppLocalizations.of(context)!.submit),
                     ),
                   ),
                 ),

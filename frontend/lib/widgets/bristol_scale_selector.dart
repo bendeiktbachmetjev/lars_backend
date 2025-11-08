@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class BristolScaleSelector extends StatelessWidget {
   final int selectedValue;
@@ -15,9 +16,9 @@ class BristolScaleSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Text(
-          'Stool Consistency',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        Text(
+          AppLocalizations.of(context)!.stoolConsistency,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
