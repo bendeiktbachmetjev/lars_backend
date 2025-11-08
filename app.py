@@ -96,24 +96,35 @@ if DATABASE_URL:
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
+        # Optimized connection args for faster connection establishment
         connect_args = {
-            "server_settings": {"application_name": "lars_backend"},
+            "server_settings": {
+                "application_name": "lars_backend",
+                "tcp_keepalives_idle": "600",
+                "tcp_keepalives_interval": "30",
+                "tcp_keepalives_count": "3",
+            },
+            "command_timeout": 30,  # Timeout for SQL commands (30 seconds)
+            "timeout": 10,  # Connection timeout (10 seconds - fail fast)
         }
         if ssl_required:
-            connect_args["ssl"] = True
+            # Minimal SSL config - just require SSL, don't verify cert (faster)
+            # Supabase pooler doesn't need cert verification
+            connect_args["ssl"] = True  # Simple SSL requirement
         
-        # Conservative pool settings to avoid Supabase Session Pooler limits
-        # Supabase free tier typically limits to 15-20 connections total
+        # Optimized pool settings for fast connections and reliability
         engine = create_async_engine(
             ASYNC_DATABASE_URL,
-            pool_pre_ping=True,
-            pool_size=5,  # Reduced to avoid hitting Supabase limits
-            max_overflow=5,  # Reduced overflow
-            pool_recycle=180,  # Recycle connections more frequently
-            pool_timeout=10,  # Shorter timeout to fail fast
+            pool_pre_ping=False,  # Disable pre-ping to speed up connections (causes delays)
+            pool_size=3,  # Small pool to avoid connection buildup
+            max_overflow=2,  # Minimal overflow
+            pool_recycle=300,  # Recycle every 5 minutes
+            pool_timeout=5,  # Fast timeout - fail quickly if no connection available
+            connect_args=connect_args,
             max_identifier_length=128,
             echo=False,
-            connect_args=connect_args,
+            # Disable connection pooling optimizations that can cause delays
+            pool_reset_on_return="commit",  # Faster connection return
         )
         
         async_session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
@@ -544,22 +555,41 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
         )
 
 
-async def _execute_with_retry(session, query, max_retries=3, initial_delay=0.1):
-    """Execute query with retry logic for connection pool exhaustion"""
+async def _execute_with_retry(session, query, max_retries=2, initial_delay=0.1):
+    """Execute query with minimal retry logic - fail fast approach"""
     for attempt in range(max_retries):
         try:
             result = await session.execute(query)
             return result
         except Exception as e:
             error_str = str(e)
-            # Check if it's a connection pool error
-            if "MaxClientsInSessionMode" in error_str or "max clients reached" in error_str.lower():
-                if attempt < max_retries - 1:
-                    # Exponential backoff: 0.1s, 0.2s, 0.4s
-                    delay = initial_delay * (2 ** attempt)
-                    await asyncio.sleep(delay)
-                    continue
-            # Re-raise if not a pool error or last attempt
+            error_type = type(e).__name__
+            
+            # Only retry on connection pool exhaustion, not on timeouts
+            # Timeouts mean connection is too slow - return immediately
+            is_pool_error = (
+                "MaxClientsInSessionMode" in error_str or 
+                "max clients reached" in error_str.lower()
+            )
+            
+            # Don't retry on timeouts - they indicate slow connections
+            is_timeout = (
+                error_type == "TimeoutError" or 
+                "timeout" in error_str.lower() or
+                "CancelledError" in error_type
+            )
+            
+            if is_timeout:
+                # Timeout means connection is too slow - return None immediately
+                print(f"Connection timeout on attempt {attempt + 1}: {error_str[:100]}")
+                return None
+            
+            if is_pool_error and attempt < max_retries - 1:
+                # Only retry pool errors with very short delay
+                await asyncio.sleep(initial_delay)
+                continue
+            
+            # Re-raise other errors or if last attempt
             raise
     return None
 
@@ -664,8 +694,13 @@ async def get_lars_data(
         print(f"Error in getLarsData: {error_type}: {error_msg}")
         traceback.print_exc()
         
-        # Return empty data instead of error if pool is exhausted
-        if "MaxClientsInSessionMode" in error_msg or "max clients reached" in error_msg.lower():
+        # Return empty data instead of error for connection issues
+        if ("MaxClientsInSessionMode" in error_msg or 
+            "max clients reached" in error_msg.lower() or
+            "TimeoutError" in error_type or
+            "timeout" in error_msg.lower() or
+            "CancelledError" in error_type):
+            print(f"Connection issue in getLarsData, returning empty data: {error_type}")
             return {"status": "ok", "data": []}
         
         return JSONResponse(
