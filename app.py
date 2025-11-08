@@ -1,6 +1,7 @@
 import os
 import json
 import traceback
+import asyncio
 from typing import Optional
 from urllib.parse import urlsplit
 
@@ -101,13 +102,15 @@ if DATABASE_URL:
         if ssl_required:
             connect_args["ssl"] = True
         
+        # Conservative pool settings to avoid Supabase Session Pooler limits
+        # Supabase free tier typically limits to 15-20 connections total
         engine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
-            pool_size=10,
-            max_overflow=20,
-            pool_recycle=300,
-            pool_timeout=30,
+            pool_size=5,  # Reduced to avoid hitting Supabase limits
+            max_overflow=5,  # Reduced overflow
+            pool_recycle=180,  # Recycle connections more frequently
+            pool_timeout=10,  # Shorter timeout to fail fast
             max_identifier_length=128,
             echo=False,
             connect_args=connect_args,
@@ -541,6 +544,26 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
         )
 
 
+async def _execute_with_retry(session, query, max_retries=3, initial_delay=0.1):
+    """Execute query with retry logic for connection pool exhaustion"""
+    for attempt in range(max_retries):
+        try:
+            result = await session.execute(query)
+            return result
+        except Exception as e:
+            error_str = str(e)
+            # Check if it's a connection pool error
+            if "MaxClientsInSessionMode" in error_str or "max clients reached" in error_str.lower():
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 0.1s, 0.2s, 0.4s
+                    delay = initial_delay * (2 ** attempt)
+                    await asyncio.sleep(delay)
+                    continue
+            # Re-raise if not a pool error or last attempt
+            raise
+    return None
+
+
 @app.get("/getLarsData")
 async def get_lars_data(
     period: str,  # "weekly", "monthly", or "yearly"
@@ -549,6 +572,7 @@ async def get_lars_data(
     """
     Get LARS score data for a patient grouped by time period.
     Returns data points with entry_date and total_score for the specified period.
+    Optimized: combines patient lookup and data query in single SQL.
     """
     if not x_patient_code:
         raise HTTPException(status_code=400, detail="Missing X-Patient-Code header")
@@ -565,65 +589,58 @@ async def get_lars_data(
     
     try:
         async with async_session() as session:
-            # Get patient_id
-            patient_res = await session.execute(
-                text("SELECT id FROM patients WHERE patient_code = :code").bindparams(code=patient_code)
-            )
-            patient_row = patient_res.first()
-            if not patient_row:
-                return {"status": "ok", "data": []}
-            
-            patient_id = patient_row[0]
-            
-            # Build SQL query based on period
-            # For weekly: group by week
-            # For monthly: group by month
-            # For yearly: group by year
+            # Optimized: Get patient_id and data in ONE query using JOIN
             if period == "weekly":
-                # Get last 5 weeks of data, grouped by week
-                # Show all data if there's less than 5 weeks worth
                 query = text("""
                     SELECT 
-                        DATE_TRUNC('week', entry_date) as period_start,
-                        AVG(total_score)::INTEGER as avg_score,
-                        MIN(entry_date) as first_entry_date
-                    FROM weekly_entries
-                    WHERE patient_id = :patient_id 
-                        AND total_score IS NOT NULL
-                    GROUP BY DATE_TRUNC('week', entry_date)
+                        DATE_TRUNC('week', we.entry_date) as period_start,
+                        AVG(we.total_score)::INTEGER as avg_score,
+                        MIN(we.entry_date) as first_entry_date
+                    FROM weekly_entries we
+                    INNER JOIN patients p ON p.id = we.patient_id
+                    WHERE p.patient_code = :code
+                        AND we.total_score IS NOT NULL
+                    GROUP BY DATE_TRUNC('week', we.entry_date)
                     ORDER BY period_start DESC
                     LIMIT 5
                 """)
             elif period == "monthly":
-                # Get last 6 months of data, grouped by month
                 query = text("""
                     SELECT 
-                        DATE_TRUNC('month', entry_date) as period_start,
-                        AVG(total_score)::INTEGER as avg_score,
-                        MIN(entry_date) as first_entry_date
-                    FROM weekly_entries
-                    WHERE patient_id = :patient_id 
-                        AND total_score IS NOT NULL
-                        AND entry_date >= CURRENT_DATE - INTERVAL '6 months'
-                    GROUP BY DATE_TRUNC('month', entry_date)
+                        DATE_TRUNC('month', we.entry_date) as period_start,
+                        AVG(we.total_score)::INTEGER as avg_score,
+                        MIN(we.entry_date) as first_entry_date
+                    FROM weekly_entries we
+                    INNER JOIN patients p ON p.id = we.patient_id
+                    WHERE p.patient_code = :code
+                        AND we.total_score IS NOT NULL
+                        AND we.entry_date >= CURRENT_DATE - INTERVAL '6 months'
+                    GROUP BY DATE_TRUNC('month', we.entry_date)
                     ORDER BY period_start ASC
                 """)
             else:  # yearly
-                # Get last 5 years of data, grouped by year
                 query = text("""
                     SELECT 
-                        DATE_TRUNC('year', entry_date) as period_start,
-                        AVG(total_score)::INTEGER as avg_score,
-                        MIN(entry_date) as first_entry_date
-                    FROM weekly_entries
-                    WHERE patient_id = :patient_id 
-                        AND total_score IS NOT NULL
-                        AND entry_date >= CURRENT_DATE - INTERVAL '5 years'
-                    GROUP BY DATE_TRUNC('year', entry_date)
+                        DATE_TRUNC('year', we.entry_date) as period_start,
+                        AVG(we.total_score)::INTEGER as avg_score,
+                        MIN(we.entry_date) as first_entry_date
+                    FROM weekly_entries we
+                    INNER JOIN patients p ON p.id = we.patient_id
+                    WHERE p.patient_code = :code
+                        AND we.total_score IS NOT NULL
+                        AND we.entry_date >= CURRENT_DATE - INTERVAL '5 years'
+                    GROUP BY DATE_TRUNC('year', we.entry_date)
                     ORDER BY period_start ASC
                 """)
             
-            result = await session.execute(query.bindparams(patient_id=patient_id))
+            # Execute with retry logic
+            result = await _execute_with_retry(session, query.bindparams(code=patient_code))
+            if result is None:
+                return JSONResponse(
+                    status_code=503,
+                    content={"status": "error", "detail": "Database connection pool exhausted, please try again"}
+                )
+            
             rows = result.fetchall()
             
             # Reverse if ordered DESC to get chronological order
@@ -639,11 +656,18 @@ async def get_lars_data(
                 })
             
             return {"status": "ok", "data": data}
+    except HTTPException:
+        raise
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
         print(f"Error in getLarsData: {error_type}: {error_msg}")
         traceback.print_exc()
+        
+        # Return empty data instead of error if pool is exhausted
+        if "MaxClientsInSessionMode" in error_msg or "max clients reached" in error_msg.lower():
+            return {"status": "ok", "data": []}
+        
         return JSONResponse(
             status_code=500,
             content={"status": "error", "detail": error_msg, "error_type": error_type}
@@ -676,7 +700,9 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
             today = date.today()
             
             # Optimized: Get all patient data and last completion dates in ONE query
-            patient_res = await session.execute(
+            # Use retry logic for connection pool issues
+            patient_res = await _execute_with_retry(
+                session,
                 text("""
                     SELECT 
                         p.id,
@@ -689,6 +715,14 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                     WHERE p.patient_code = :code
                 """).bindparams(code=patient_code)
             )
+            if patient_res is None:
+                # Return default if pool exhausted
+                return {
+                    "status": "ok",
+                    "questionnaire_type": "daily",
+                    "is_today_filled": False,
+                    "reason": "Unable to determine questionnaire (database pool exhausted)"
+                }
             patient_row = patient_res.first()
             
             # If patient doesn't exist, suggest first questionnaire (weekly) - patient will be created when they submit
@@ -739,7 +773,8 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                         min_date = min(range_item[2] for range_item in date_ranges)
                         max_date = max(range_item[3] for range_item in date_ranges)
                         
-                        check_res = await session.execute(
+                        check_res = await _execute_with_retry(
+                            session,
                             text("""
                                 SELECT entry_date
                                 FROM eq5d5l_entries
@@ -752,7 +787,11 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                                 max_date=max_date
                             )
                         )
-                        filled_dates = {row[0] for row in check_res.fetchall()}
+                        if check_res is None:
+                            # Skip milestone check if pool exhausted
+                            filled_dates = set()
+                        else:
+                            filled_dates = {row[0] for row in check_res.fetchall()}
                         
                         # Find first unfilled milestone
                         for milestone_days, milestone_date, window_start, window_end in date_ranges:
@@ -832,12 +871,14 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
                     }
                     table_name = table_map.get(questionnaire_type)
                     if table_name:
-                        check = await session.execute(
+                        check = await _execute_with_retry(
+                            session,
                             text(f"SELECT COUNT(*) FROM {table_name} WHERE patient_id = :pid AND entry_date = :today")
                             .bindparams(pid=patient_id, today=today)
                         )
-                        check_row = check.first()
-                        is_today_filled = check_row[0] > 0 if check_row else False
+                        if check is not None:
+                            check_row = check.first()
+                            is_today_filled = check_row[0] > 0 if check_row else False
                 except Exception as check_error:
                     # If check fails, assume not filled
                     print(f"Warning: Failed to check if today's questionnaire is filled: {check_error}")
