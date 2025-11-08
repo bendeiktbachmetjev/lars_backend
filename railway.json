@@ -1,0 +1,23 @@
+{
+  "build": {
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "restartPolicyType": "ON_FAILURE",
+    "healthcheckPath": "/healthz",
+    "healthcheckTimeout": 100,
+    "startCommand": "python startup.py"
+  },
+  "envVars": {
+    "DATABASE_URL": {
+      "required": true
+    },
+    "SUPABASE_SSLMODE": {
+      "required": false,
+      "value": "require"
+    }
+  }
+}
+
+
