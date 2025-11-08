@@ -96,7 +96,7 @@ if DATABASE_URL:
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
         ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
-        # Optimized connection args for faster connection establishment
+        # Optimized connection args for reliability
         connect_args = {
             "server_settings": {
                 "application_name": "lars_backend",
@@ -104,26 +104,25 @@ if DATABASE_URL:
                 "tcp_keepalives_interval": "30",
                 "tcp_keepalives_count": "3",
             },
-            "command_timeout": 30,  # Timeout for SQL commands (30 seconds)
-            "timeout": 10,  # Connection timeout (10 seconds - fail fast)
+            "command_timeout": 60,  # Timeout for SQL commands (60 seconds - longer for complex queries)
+            "timeout": 20,  # Connection timeout (20 seconds - enough for Supabase pooler)
         }
         if ssl_required:
             # Minimal SSL config - just require SSL, don't verify cert (faster)
             # Supabase pooler doesn't need cert verification
             connect_args["ssl"] = True  # Simple SSL requirement
         
-        # Optimized pool settings for fast connections and reliability
+        # Optimized pool settings for reliability with multiple concurrent users
         engine = create_async_engine(
             ASYNC_DATABASE_URL,
-            pool_pre_ping=False,  # Disable pre-ping to speed up connections (causes delays)
-            pool_size=3,  # Small pool to avoid connection buildup
-            max_overflow=2,  # Minimal overflow
-            pool_recycle=300,  # Recycle every 5 minutes
-            pool_timeout=5,  # Fast timeout - fail quickly if no connection available
+            pool_pre_ping=True,  # Enable pre-ping to detect dead connections
+            pool_size=10,  # Increased pool size for concurrent requests
+            max_overflow=20,  # Allow more overflow for peak loads
+            pool_recycle=3600,  # Recycle every hour (Supabase connections are stable)
+            pool_timeout=30,  # Longer timeout to wait for available connection
             connect_args=connect_args,
             max_identifier_length=128,
             echo=False,
-            # Disable connection pooling optimizations that can cause delays
             pool_reset_on_return="commit",  # Faster connection return
         )
         
@@ -555,8 +554,9 @@ async def send_eq5d5l(payload: Eq5d5lPayload, x_patient_code: Optional[str] = He
         )
 
 
-async def _execute_with_retry(session, query, max_retries=2, initial_delay=0.1):
-    """Execute query with minimal retry logic - fail fast approach"""
+async def _execute_with_retry(session, query, max_retries=3, initial_delay=0.5):
+    """Execute query with retry logic for transient errors"""
+    last_error = None
     for attempt in range(max_retries):
         try:
             result = await session.execute(query)
@@ -564,34 +564,64 @@ async def _execute_with_retry(session, query, max_retries=2, initial_delay=0.1):
         except Exception as e:
             error_str = str(e)
             error_type = type(e).__name__
+            last_error = e
             
-            # Only retry on connection pool exhaustion, not on timeouts
-            # Timeouts mean connection is too slow - return immediately
+            # Identify different error types
             is_pool_error = (
                 "MaxClientsInSessionMode" in error_str or 
-                "max clients reached" in error_str.lower()
+                "max clients reached" in error_str.lower() or
+                "pool" in error_str.lower() or
+                "connection" in error_str.lower() and "unavailable" in error_str.lower()
             )
             
-            # Don't retry on timeouts - they indicate slow connections
             is_timeout = (
                 error_type == "TimeoutError" or 
                 "timeout" in error_str.lower() or
-                "CancelledError" in error_type
+                "CancelledError" in error_type or
+                "asyncio.TimeoutError" in error_type
             )
             
-            if is_timeout:
-                # Timeout means connection is too slow - return None immediately
-                print(f"Connection timeout on attempt {attempt + 1}: {error_str[:100]}")
-                return None
+            is_connection_error = (
+                "connection" in error_str.lower() and (
+                    "closed" in error_str.lower() or
+                    "lost" in error_str.lower() or
+                    "reset" in error_str.lower()
+                )
+            )
             
-            if is_pool_error and attempt < max_retries - 1:
-                # Only retry pool errors with very short delay
-                await asyncio.sleep(initial_delay)
+            # Log the error
+            print(f"Database error on attempt {attempt + 1}/{max_retries}: {error_type}: {error_str[:200]}")
+            
+            # Retry on pool errors and connection errors (transient)
+            if (is_pool_error or is_connection_error) and attempt < max_retries - 1:
+                # Exponential backoff: 0.5s, 1s, 2s
+                delay = initial_delay * (2 ** attempt)
+                print(f"Retrying after {delay}s...")
+                await asyncio.sleep(delay)
                 continue
             
-            # Re-raise other errors or if last attempt
-            raise
-    return None
+            # For timeouts, retry once more with longer delay
+            if is_timeout and attempt < max_retries - 1:
+                delay = initial_delay * (2 ** attempt) * 2  # Longer delay for timeouts
+                print(f"Timeout detected, retrying after {delay}s...")
+                await asyncio.sleep(delay)
+                continue
+            
+            # Don't retry on other errors (syntax errors, constraint violations, etc.)
+            if not (is_pool_error or is_timeout or is_connection_error):
+                print(f"Non-retryable error: {error_type}: {error_str[:200]}")
+                raise
+            
+            # If we're on the last attempt, raise the error
+            if attempt == max_retries - 1:
+                print(f"Max retries reached, failing with: {error_type}: {error_str[:200]}")
+                raise
+    
+    # This shouldn't be reached, but just in case - raise the last error
+    if last_error:
+        raise last_error
+    # If we somehow got here without an error, something is wrong
+    raise Exception("_execute_with_retry completed without result or error")
 
 
 @app.get("/getLarsData")
@@ -664,14 +694,29 @@ async def get_lars_data(
                 """)
             
             # Execute with retry logic
-            result = await _execute_with_retry(session, query.bindparams(code=patient_code))
-            if result is None:
+            try:
+                result = await _execute_with_retry(session, query.bindparams(code=patient_code))
+                if result is None:
+                    # This shouldn't happen with new retry logic, but keep for safety
+                    print("WARNING: _execute_with_retry returned None unexpectedly")
+                    return JSONResponse(
+                        status_code=503,
+                        content={"status": "error", "detail": "Database connection timeout, please try again"}
+                    )
+                rows = result.fetchall()
+            except Exception as query_error:
+                # If retry logic failed, log and return 503
+                error_msg = str(query_error)
+                error_type = type(query_error).__name__
+                print(f"Query execution failed after retries: {error_type}: {error_msg[:200]}")
                 return JSONResponse(
                     status_code=503,
-                    content={"status": "error", "detail": "Database connection pool exhausted, please try again"}
+                    content={
+                        "status": "error", 
+                        "detail": f"Database error: {error_type}. Please try again.",
+                        "error_type": error_type
+                    }
                 )
-            
-            rows = result.fetchall()
             
             # Reverse if ordered DESC to get chronological order
             if period == "weekly" and rows:
@@ -736,29 +781,42 @@ async def get_next_questionnaire(x_patient_code: Optional[str] = Header(None)):
             
             # Optimized: Get all patient data and last completion dates in ONE query
             # Use retry logic for connection pool issues
-            patient_res = await _execute_with_retry(
-                session,
-                text("""
-                    SELECT 
-                        p.id,
-                        p.created_at::DATE as patient_created_date,
-                        (SELECT MAX(entry_date) FROM weekly_entries WHERE patient_id = p.id) as last_weekly_date,
-                        (SELECT MAX(entry_date) FROM monthly_entries WHERE patient_id = p.id) as last_monthly_date,
-                        (SELECT MAX(entry_date) FROM eq5d5l_entries WHERE patient_id = p.id) as last_eq5d5l_date,
-                        (SELECT MAX(entry_date) FROM daily_entries WHERE patient_id = p.id) as last_daily_date
-                    FROM patients p
-                    WHERE p.patient_code = :code
-                """).bindparams(code=patient_code)
-            )
-            if patient_res is None:
-                # Return default if pool exhausted
+            try:
+                patient_res = await _execute_with_retry(
+                    session,
+                    text("""
+                        SELECT 
+                            p.id,
+                            p.created_at::DATE as patient_created_date,
+                            (SELECT MAX(entry_date) FROM weekly_entries WHERE patient_id = p.id) as last_weekly_date,
+                            (SELECT MAX(entry_date) FROM monthly_entries WHERE patient_id = p.id) as last_monthly_date,
+                            (SELECT MAX(entry_date) FROM eq5d5l_entries WHERE patient_id = p.id) as last_eq5d5l_date,
+                            (SELECT MAX(entry_date) FROM daily_entries WHERE patient_id = p.id) as last_daily_date
+                        FROM patients p
+                        WHERE p.patient_code = :code
+                    """).bindparams(code=patient_code)
+                )
+                if patient_res is None:
+                    # This shouldn't happen with new retry logic, but keep for safety
+                    print("WARNING: _execute_with_retry returned None in getNextQuestionnaire")
+                    return {
+                        "status": "ok",
+                        "questionnaire_type": "daily",
+                        "is_today_filled": False,
+                        "reason": "Unable to determine questionnaire (database timeout)"
+                    }
+                patient_row = patient_res.first()
+            except Exception as query_error:
+                # If query failed after retries, return default response
+                error_msg = str(query_error)
+                error_type = type(query_error).__name__
+                print(f"Query execution failed in getNextQuestionnaire: {error_type}: {error_msg[:200]}")
                 return {
                     "status": "ok",
                     "questionnaire_type": "daily",
                     "is_today_filled": False,
-                    "reason": "Unable to determine questionnaire (database pool exhausted)"
+                    "reason": f"Unable to determine questionnaire (database error: {error_type})"
                 }
-            patient_row = patient_res.first()
             
             # If patient doesn't exist, suggest first questionnaire (weekly) - patient will be created when they submit
             if not patient_row:
