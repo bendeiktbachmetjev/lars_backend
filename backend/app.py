@@ -101,13 +101,16 @@ if DATABASE_URL:
         if ssl_required:
             connect_args["ssl"] = True
         
+        # Supabase Session Pooler doesn't support max_overflow - it limits to pool_size only
+        # So we need to set pool_size to the maximum we need
+        # For 1000-2000 patients with concurrent requests, 50 connections should be sufficient
         engine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
-            pool_size=20,        # Base pool size for 1000-2000 patients
-            max_overflow=30,       # Additional connections for peak load (total max: 50)
-            pool_recycle=300,     # Recycle connections every 5 minutes
-            pool_timeout=30,      # Wait up to 30 seconds for a connection from pool
+            pool_size=50,        # Supabase Session Pooler limit - no overflow support
+            max_overflow=0,      # Disabled - not supported by Supabase Session Pooler
+            pool_recycle=300,    # Recycle connections every 5 minutes
+            pool_timeout=30,     # Wait up to 30 seconds for a connection from pool
             echo=False,
             connect_args=connect_args,
         )
