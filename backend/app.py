@@ -81,19 +81,22 @@ async_session = None
 
 if DATABASE_URL:
     try:
-        # ПРОСТОЕ РЕШЕНИЕ: автоматически переключаемся на Session Pooler (порт 5432)
-        # Transaction Pooler (порт 6543) не поддерживает prepared statements
-        # Заменяем :6543 на :5432 если используется pooler
+        # Use Session Pooler (port 5432) - it supports prepared statements
+        # Transaction Pooler (port 6543) doesn't support prepared statements
+        # Session Pooler has connection limits, so we need to optimize pool settings
+        original_url = DATABASE_URL
+        
+        # Ensure we're using Session Pooler (port 5432)
         if ":6543" in DATABASE_URL:
             DATABASE_URL = DATABASE_URL.replace(":6543", ":5432")
             print("Switched from Transaction Pooler (6543) to Session Pooler (5432) for prepared statements support")
         elif ".pooler.supabase.com" in DATABASE_URL and ":5432" not in DATABASE_URL:
-            # Если pooler, но порт не указан явно - добавляем 5432
+            # If pooler, but port not explicitly set - add 5432
             DATABASE_URL = DATABASE_URL.replace(".pooler.supabase.com", ".pooler.supabase.com:5432")
             print("Added Session Pooler port (5432) for prepared statements support")
         
         ASYNC_DATABASE_URL = _build_async_url(DATABASE_URL)
-        ssl_required = "sslmode=require" in DATABASE_URL.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
+        ssl_required = "sslmode=require" in original_url.lower() or os.getenv("SUPABASE_SSLMODE") == "require"
         
         connect_args = {
             "server_settings": {"application_name": "lars_backend"},
@@ -101,9 +104,9 @@ if DATABASE_URL:
         if ssl_required:
             connect_args["ssl"] = True
         
-        # Supabase Session Pooler doesn't support max_overflow - it limits to pool_size only
-        # So we need to set pool_size to the maximum we need
-        # For 1000-2000 patients with concurrent requests, 50 connections should be sufficient
+        # Supabase Session Pooler limits connections to pool_size only (no max_overflow support)
+        # For 1000-2000 patients, we need more connections but must stay within pooler limits
+        # Increase pool_size to handle concurrent requests
         engine = create_async_engine(
             ASYNC_DATABASE_URL,
             pool_pre_ping=True,
